@@ -507,7 +507,7 @@ function renderTable(panelId){
     // 氏名降順（ja ロケール）
     Object.keys(buckets).forEach(function(k){
       buckets[k].sort(function(a,b){
-        return String(b.name||'').localeCompare(String(a.name||''), 'ja');
+      return String(b.name||'').localeCompare(String(a.name||''), 'ja') * -1;
       });
     });
 
