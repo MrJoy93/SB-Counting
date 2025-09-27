@@ -93,6 +93,7 @@
       <button class="tab-btn" aria-selected="false" data-tab="tab4">在籍顧問</button>
     </nav>
     <div class="overall-unpaid" id="overall-unpaid" aria-live="polite">総未払合計: ¥0</div>
+    <div class="overall-unpaid" id="adviser-unpaid" aria-live="polite">顧問未払合計: ¥0</div>
   </div>
 </header>
 
@@ -429,17 +430,31 @@ function normalizeData(raw){
     updateOverallUnpaid();
   }
 
-  function updateOverallUnpaid(){
-    const el = document.getElementById('overall-unpaid');
-    if(!el) return;
-    let grand = 0;
-    for(const mid of MAIN_TABS){
-      const d1 = normalizeData(readNames(mid+'-sub1'));
-      const d2 = normalizeData(readNames(mid+'-sub2'));
+function updateOverallUnpaid(){
+  const grandEl = document.getElementById('overall-unpaid');
+  const advEl   = document.getElementById('adviser-unpaid');
+  if(!grandEl) return;
+
+  let grand = 0; // 在籍顧問を除いた総未払
+  let adviserSum = 0; // 在籍顧問の未払合計
+
+  for(const mid of MAIN_TABS){
+    const d1 = normalizeData(readNames(mid+'-sub1'));
+    const d2 = normalizeData(readNames(mid+'-sub2'));
+    if(mid === 'tab4'){
+      // 在籍顧問タブ（sub1のみ）
+      adviserSum += sumUnpaidForData(mid+'-sub1', d1);
+      // ※ 総未払(grand)には加算しない
+    } else {
       grand += sumUnpaidForData(mid+'-sub1', d1) + sumUnpaidForData(mid+'-sub2', d2);
     }
-    el.textContent = '総未払合計: ¥'+fmtJPY.format(grand);
   }
+
+  grandEl.textContent = '総未払合計: ¥' + fmtJPY.format(grand);
+  if(advEl){
+    advEl.textContent = '顧問未払合計: ¥' + fmtJPY.format(adviserSum);
+  }
+}
 
   // テーブル描画
 function renderTable(panelId){
