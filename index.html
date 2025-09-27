@@ -336,6 +336,12 @@
 
 <script>
 
+function focusCell(panelId, r, k){
+  const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+r+'"][data-di="'+k+'"]';
+  const el = document.querySelector(sel);
+  if(el){ el.focus(); if(el.select) el.select(); }
+}
+
   // Enterで次要素に移動（最後ならsubmit）
 function enableEnterTabbing(root){
   const sel = 'input, select, textarea, button';
@@ -725,31 +731,45 @@ document.addEventListener('change', (e)=>{
   const panelId = el.dataset.panel; const r=Number(el.dataset.row), k=Number(el.dataset.di);
   const data = normalizeData(readNames(panelId)); if(!data[r]) return;
   const raw = (el.value||"").trim();
+  const isAdv = isAdviser(panelId);
 
+  // ★ 次にフォーカスするターゲット（自然なTab順：同じ行の次→行送り）
+  const totalSlots = (data[r].dates && data[r].dates.length) ? data[r].dates.length : 10;
+  const nextK = (k + 1 < totalSlots) ? (k + 1) : 0;
+  const nextR = (k + 1 < totalSlots) ? r : (r + 1);
+
+  // 空入力（削除）の処理
   if(raw === ""){
     el.classList.remove('invalid');
     const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
     data[r].dates[k] = { md:"", ymd:"", checked: wasChecked };
-    saveNames(panelId, data); renderTable(panelId);
+    saveNames(panelId, data);
+    renderTable(panelId);
+    // ★ 再描画後に次セルへ
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
     return;
   }
 
-  if(isAdviser(panelId)){
-    // DD-only
+  if(isAdv){
+    // 在籍顧問：DDのみ
     if(!DD_RE.test(raw)){ el.classList.add('invalid'); return; }
     el.classList.remove('invalid');
     const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
     data[r].dates[k] = { md: raw, ymd: "", checked: wasChecked };
-    saveNames(panelId, data); renderTable(panelId);
+    saveNames(panelId, data);
+    renderTable(panelId);
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
   }else{
-    // MM/DD
+    // 通常：MM/DD → YYYY-MM-DD
     const md = parseMD(raw);
     if(!md){ el.classList.add('invalid'); return; }
     el.classList.remove('invalid');
     const yyyy = inferYear();
     const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
     data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
-    saveNames(panelId, data); renderTable(panelId);
+    saveNames(panelId, data);
+    renderTable(panelId);
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
   }
 });
 
