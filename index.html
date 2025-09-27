@@ -65,11 +65,26 @@
   .buy-list .name{align-self:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .buy-list input{width:100%}
   .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+
+  /* Adviser (在籍顧問) のグループ見出し＆小計行 */
+.group-row td{
+  background:#20365a;
+  color:#bfefff;
+  font-weight:700;
+  border-bottom:1px solid rgba(0,245,255,.35);
+}
+.group-subtotal td{
+  background:#1a2b49;
+  color:#eaf6ff;
+  font-weight:700;
+  border-top:1px dashed rgba(0,245,255,.35);
+}
+
 </style>
 </head>
 <body>
 <header>
-  <h1>SB-Counting</h1>
+  <h1>SB-Counting Ver.1.1</h1>
   <div class="tabs-bar">
     <nav class="tabs" aria-label="Main Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab1">タチバナ</button>
@@ -435,47 +450,114 @@ function renderTable(panelId){
   const isAdv = isAdviser(panelId);
 
   function groupLabel(id){
-    return id==='tab1'?'タチバナ': id==='tab2'?'ＯＺ': id==='tab3'?'その他':'';
+    return id==='tab1' ? 'タチバナ'
+         : id==='tab2' ? 'ＯＺ'
+         : id==='tab3' ? 'その他'
+         : '未設定';
   }
 
-  tbody.innerHTML = data.map((row,i)=>{
-    const buyCell = (!isAdv && isSB) ? '<td class="buy-cell">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
-    const groupCell = isAdv ? '<td>'+esc(groupLabel(row.group||""))+'</td>' : '';
-    const dateCells = (row.dates||[]).map((cell,k)=>{
-      const v = cell && (cell.md || isoToMD(cell.ymd||"")) || "";
-      if(isAdv){
-        return '<td class="date-td"><div class="date-wrap">\
-          <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" value="'+esc(v)+'" maxlength="5" pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
-        </div></td>';
-      } else {
-        const checked = cell && cell.checked ? 'checked' : '';
-        const tdCls = cell && cell.checked ? 'date-td is-checked' : 'date-td';
-        return '<td class="'+tdCls+'"><label class="date-wrap">\
-          <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
-          <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" value="'+esc(v)+'" maxlength="5" pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
-        </label></td>';
-      }
-    }).join("");
+  // === 在籍顧問：グループごとにまとめ、氏名は降順、グループ小計（金額）を表示 ===
+  if(isAdv){
+    // 列数: #, 氏名, D1..D10(10列), 合計, 未払, 操作 = 15
+    const COLS = 15;
 
-    const total = calcAmount(panelId, row.dates);
+    // バケット化
+    const buckets = { tab1:[], tab2:[], tab3:[], _other:[] };
+    data.forEach(function(row){ 
+      const key = (row.group==='tab1' || row.group==='tab2' || row.group==='tab3') ? row.group : '_other';
+      buckets[key].push(row);
+    });
+
+    // 氏名降順（ja ロケール）
+    Object.keys(buckets).forEach(function(k){
+      buckets[k].sort(function(a,b){
+        return String(b.name||'').localeCompare(String(a.name||''), 'ja');
+      });
+    });
+
+    const order = ['tab1','tab2','tab3','_other'];
+    const htmlParts = [];
+
+    order.forEach(function(g){
+      const rows = buckets[g]; if(!rows || rows.length===0) return;
+      const label = g==='_other' ? '未設定' : groupLabel(g);
+
+      // グループ見出し行
+      htmlParts.push('<tr class="group-row"><td colspan="'+COLS+'">グループ：'+esc(label)+'</td></tr>');
+
+      let groupTotal = 0;
+
+      rows.forEach(function(row){
+        // 元データ上のインデックス（削除ボタン用）
+        const originalIndex = data.indexOf(row);
+
+        const dateCells = (row.dates||[]).map(function(cell,k){
+          const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
+          return '<td class="date-td"><div class="date-wrap">\
+            <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
+data-panel="'+panelId+'" data-row="'+originalIndex+'" data-di="'+k+'" \
+value="'+esc(v)+'" maxlength="5" \
+pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
+          </div></td>';
+        }).join('');
+
+        const total  = calcAmount(panelId, row.dates);
+        const unpaid = calcUnpaid(panelId, row.dates, total);
+        groupTotal  += Number(total)||0;
+
+        htmlParts.push('<tr>\
+          <td>'+(htmlParts.length)+'</td>\
+          <td>'+esc(row.name)+'</td>\
+          '+dateCells+'\
+          <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>\
+          <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
+          <td><button class="btn" data-action="del" data-index="'+originalIndex+'" data-panel="'+panelId+'">削除</button></td>\
+        </tr>');
+      });
+
+      // グループ小計行
+      htmlParts.push('<tr class="group-subtotal"><td colspan="'+COLS+'">グループ合計金額：¥'+fmtJPY.format(groupTotal)+'</td></tr>');
+    });
+
+    tbody.innerHTML = htmlParts.join('');
+    updateMainUnpaid(panelId.split('-')[0]);
+    return;
+  }
+
+  // === 通常タブ（タチバナ／ＯＺ／その他）は従来通り ===
+  tbody.innerHTML = data.map(function(row,i){
+    const buyCell = (!isAdv && isSB) ? '<td class="buy-cell">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
+    const dateCells = (row.dates||[]).map(function(cell,k){
+      const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
+      const checked = cell && cell.checked ? 'checked' : '';
+      const tdCls   = cell && cell.checked ? 'date-td is-checked' : 'date-td';
+      return '<td class="'+tdCls+'"><label class="date-wrap">\
+        <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
+        <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
+data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" value="'+esc(v)+'" maxlength="5" \
+pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
+      </label></td>';
+    }).join('');
+
+    const total  = calcAmount(panelId, row.dates);
     const unpaid = calcUnpaid(panelId, row.dates, total);
     const remainCell = (!isAdv && isSB) ? '<td class="remain-cell">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
 
     return '<tr>\
       <td>'+(i+1)+'</td>\
       <td>'+esc(row.name)+'</td>\
-      '+groupCell+'\
       '+buyCell+dateCells+'\
       <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>\
       '+remainCell+'\
       <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
       <td><button class="btn" data-action="del" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
     </tr>';
-  }).join("");
+  }).join('');
 
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
 }
+
 
 
   // フォーム初期化
@@ -711,5 +793,3 @@ document.querySelectorAll('form.name-form').forEach(initForm);
 </script>
 </body>
 </html>
-
-
