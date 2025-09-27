@@ -652,15 +652,36 @@ document.querySelectorAll('form.name-form').forEach(initForm);
 document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
 
 
-  // 削除（アクティブ）
+  // 削除（アクティブ）※確認ダイアログ付き
   document.addEventListener('click', (e)=>{
     const btn = e.target.closest('button[data-action="del"]');
     if(!btn) return;
-    const panelId = btn.dataset.panel; const idx = Number(btn.dataset.index);
+    const panelId = btn.dataset.panel; 
+    const idx = Number(btn.dataset.index);
     const data = normalizeData(readNames(panelId));
-    data.splice(idx,1); saveNames(panelId, data);
-    renderTable(panelId); if(!isAdviser(panelId)) renderCompletedTable(panelId);
+    const row = data[idx];
+    const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
+    if(!window.confirm(`${name} を削除します。よろしいですか？`)) return;
+    data.splice(idx,1); 
+    saveNames(panelId, data);
+    renderTable(panelId); 
+    if(!isAdviser(panelId)) renderCompletedTable(panelId);
   });
+
+  // 削除（完了テーブル）※確認ダイアログ付き
+document.addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-action="cdel"]');
+  if(!btn) return;
+  const panelId = btn.dataset.panel; 
+  const idx = Number(btn.dataset.index);
+  const data = normalizeData(readCompleted(panelId));
+  const row = data[idx];
+  const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
+  if(!window.confirm(`${name} を完了一覧から削除します。よろしいですか？`)) return;
+  data.splice(idx,1);
+  saveCompleted(panelId, data);
+  renderCompletedTable(panelId);
+});
 
   // モーダル（買取金額一括編集：tab1-3 の SB）
   function openBuyEditor(panelId){
