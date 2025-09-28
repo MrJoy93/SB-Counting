@@ -242,13 +242,19 @@ nav.tabs {
   }
 }
 
+@media (max-width: 720px) {
+  .filter-row { display:block; }
+}
+@media (min-width: 721px) {
+  .filter-row { display:none; } /* PCでは非表示 */
+}
 
 
 </style>
 </head>
 <body>
 <header>
-  <h1>SB-Counting Ver.2.0</h1>
+  <h1>SB-Counting Ver.2.3</h1>
   <div class="tabs-bar">
     <nav class="tabs" aria-label="Main Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab1">タチバナ</button>
@@ -284,6 +290,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+
+      <div class="row filter-row" style="margin:6px 0;">
+      <select class="input filter-select" data-panel="tab1-sub1">
+      <option value="">すべて表示</option>
+      </select>
+
+</div>
       <div class="table-wrap">
         <table class="name-table" data-panel="tab1-sub1">
           <thead>
@@ -312,6 +325,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab1-sub2">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab1-sub2">
           <thead>
@@ -348,6 +368,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab2-sub1">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab2-sub1">
           <thead>
@@ -375,6 +402,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+      
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab2-sub2">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab2-sub2">
           <thead>
@@ -411,6 +445,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+      
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab3-sub1">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab3-sub1">
           <thead>
@@ -438,6 +479,13 @@ nav.tabs {
           <button class="btn" type="submit">追加</button>
         </div>
       </form>
+      
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab3-sub2">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab3-sub2">
           <thead>
@@ -476,6 +524,13 @@ nav.tabs {
     <button class="btn" type="submit">追加</button>
   </div>
 </form>
+
+      <div class="row filter-row" style="margin:6px 0;">
+  <select class="input filter-select" data-panel="tab4-sub1">
+    <option value="">すべて表示</option>
+  </select>
+</div>
+
       <div class="table-wrap">
         <table class="name-table" data-panel="tab4-sub1">
           <thead>
@@ -865,9 +920,105 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
 
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
+
+// フィルタ用セレクトを更新
+updateFilterOptions(panelId, data);
+
+applyNameFilter(panelId);
 }
 
+function applyNameFilter(panelId){
+  const sel   = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
+  const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
+  if(!sel || !table) return;
 
+  const keyword = sel.value.trim();
+  const trs = table.querySelectorAll('tbody tr');
+
+  trs.forEach(tr=>{
+    const nameTd = tr.querySelector('td[data-label="氏名"]');
+    if(!nameTd){
+      // 在籍顧問の「グループ見出し／小計」行は、絞り込み中は非表示
+      tr.style.display = (keyword==="" ? "" : "none");
+      return;
+    }
+    const text = (nameTd.textContent||"").trim();
+    tr.style.display = (keyword==="" || text===keyword) ? "" : "none";
+  });
+}
+
+document.addEventListener('change',(e)=>{
+  const sel = e.target.closest('.filter-select');
+  if(!sel) return;
+  applyNameFilter(sel.dataset.panel);
+});
+
+function applyNameFilter(panelId){
+  const sel   = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
+  const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
+  if(!sel || !table) return;
+  const keyword = sel.value;
+  const trs = table.querySelectorAll('tbody tr');
+
+  trs.forEach(tr=>{
+    const nameTd = tr.querySelector('td[data-label="氏名"]');
+    if(!nameTd){
+      // グループ見出し/小計は、フィルタ中は非表示にする
+      tr.style.display = (keyword==="" ? "" : "none");
+      return;
+    }
+    const text = (nameTd.textContent||"").trim();
+    tr.style.display = (keyword==="" || text===keyword) ? "" : "none";
+  });
+}
+
+// ドロップダウンが変わったら適用
+document.addEventListener('change',(e)=>{
+  const sel = e.target.closest('.filter-select');
+  if(!sel) return;
+  applyNameFilter(sel.dataset.panel);
+});
+
+function updateFilterOptions(panelId, data){
+  const sel = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">すべて表示</option>';
+  const names = [...new Set(data.map(r=>r.name).filter(n=>!!n))];
+  names.sort((a,b)=> a.localeCompare(b,'ja'));
+  names.forEach(n=>{
+    const opt = document.createElement('option');
+    opt.value = n;
+    opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  if(current && [...sel.options].some(o=>o.value===current)){
+    sel.value = current;
+  } else {
+    sel.value = "";
+  }
+}
+
+document.addEventListener('change', (e)=>{
+  const sel = e.target.closest('.filter-select');
+  if(!sel) return;
+  const panelId = sel.dataset.panel;
+  const keyword = sel.value;
+  const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
+  if(!table) return;
+  const trs = table.querySelectorAll('tbody tr');
+
+  trs.forEach(tr=>{
+    const nameTd = tr.querySelector('td[data-label="氏名"]');
+    if(!nameTd) return;
+    const text = (nameTd.textContent||"").trim();
+    if(keyword==="" || text===keyword){
+      tr.style.display = "";
+    } else {
+      tr.style.display = "none";
+    }
+  });
+});
 
   // フォーム初期化
 async function initForm(form){
@@ -1170,8 +1321,7 @@ tbody.innerHTML = data.map((row,i)=>{
 function subscribePanel(panelId) {
   panelDoc(panelId).onSnapshot((doc) => {
     if(doc.exists){
-      const data = doc.data();
-      renderTable(panelId, normalizeData(data.names||[]));
+      renderTable(panelId);  // ★ normalizeData(...) を渡さずに呼ぶ
     }
   });
 }
