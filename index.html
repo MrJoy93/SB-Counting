@@ -589,6 +589,8 @@ auth.signInAnonymously().catch(console.error);
 const TENANT_ID = "prod";
 
 
+// 次にフォーカスさせたいセルの予約（renderTable完了後に拾う）
+window.__pendingFocus__ = null; // { panelId, r, k }
 
   function focusCell(panelId, r, k){
   const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+r+'"][data-di="'+k+'"]';
@@ -597,16 +599,19 @@ const TENANT_ID = "prod";
   }
 
   // Enterで次要素に移動（最後ならsubmit）
-  function enableEnterTabbing(root){
+function enableEnterTabbing(root){
   const sel = 'input, select, textarea, button';
   root.addEventListener('keydown', (e)=>{
     if(e.key !== 'Enter') return;
-    // ★ md-input は「確定(change)→再描画→focusCell」に任せる
+
+    // ★ md-input は確定(change)→再描画→予約フォーカスに任せる
     if (e.target && e.target.classList && e.target.classList.contains('md-input')) {
-     e.preventDefault();
+      e.preventDefault();
+      e.stopPropagation();
       e.target.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
+
     if(e.target && e.target.tagName === 'TEXTAREA') return; // textareaは改行を優先
     e.preventDefault();
 
@@ -769,7 +774,7 @@ document.addEventListener('change', async (e)=>{
     saveNames(panelId, data);
     renderTable(panelId);
     // ★ 再描画後に次セルへ
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+    __pendingFocus__ = { panelId, r: nextR, k: nextK };
     return;
   }
 
@@ -781,7 +786,7 @@ document.addEventListener('change', async (e)=>{
     data[r].dates[k] = { md: raw, ymd: "", checked: wasChecked };
     saveNames(panelId, data);
     renderTable(panelId);
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+    __pendingFocus__ = { panelId, r: nextR, k: nextK };
   }else{
     // 通常：MM/DD → YYYY-MM-DD
     const md = parseMD(raw);
@@ -792,7 +797,7 @@ document.addEventListener('change', async (e)=>{
     data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
     saveNames(panelId, data);
     renderTable(panelId);
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+    __pendingFocus__ = { panelId, r: nextR, k: nextK };
   }
 });
 
@@ -1006,10 +1011,22 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
 
+
 // フィルタ用セレクトを更新
 updateFilterOptions(panelId, data);
 
 applyNameFilter(panelId);
+
+  // === 再描画完了後にフォーカス予約を消化 ===
+if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
+  const { r, k } = __pendingFocus__;
+  // レイアウト確定後に確実にフォーカス（filterやグルーピングの影響を回避）
+  requestAnimationFrame(() => {
+    focusCell(panelId, r, k);
+    __pendingFocus__ = null;
+  });
+}
+
 }
 
 function updateFilterOptions(panelId, data){
