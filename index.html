@@ -80,6 +80,170 @@
   border-top:1px dashed rgba(0,245,255,.35);
 }
 
+/* スマホ画面の調整 */
+@media (max-width: 600px) {
+  header h1 { font-size: 14px; }
+  .tab-btn { padding:6px 10px; font-size:12px; }
+  .input, input, .btn { font-size:14px; padding:6px 8px; }
+
+  /* フォーム行は縦積み */
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .row .input, .row .btn {
+    width: 100%;
+  }
+
+  /* テーブルは横スクロールを前提に */
+  table { font-size: 12px; }
+  th, td { padding:4px; }
+}
+
+nav.tabs {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal .dialog {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* === Mobile Card Layout === */
+@media (max-width: 720px) {
+  /* テーブル→カード化の基本 */
+  .table-wrap { overflow: visible; }
+  table { display:block; border-collapse: initial; border-spacing:0; }
+  thead { display:none; }
+  tbody { display:block; }
+  tbody tr {
+    display:block;
+    background:#162038;
+    border:1px solid rgba(0,245,255,.18);
+    border-radius:12px;
+    margin:12px 0;
+    padding:8px 10px;
+    overflow:hidden;
+  }
+  tbody td {
+    display:grid;
+    grid-template-columns: 8.5em 1fr; /* 左がラベル、右が値 */
+    gap:8px;
+    align-items:center;
+    border:none !important;
+    padding:6px 4px;
+    white-space:normal;
+  }
+  tbody td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 12px;
+    letter-spacing: .06em;
+  }
+
+  /* 金額系は強調しつつ右寄せ維持 */
+  .amount-cell, .unpaid-cell, .remain-cell { text-align:right; font-weight:700; }
+
+  /* 日付セル（D1〜D10）は詰めて表示 */
+  .date-td .date-wrap { align-items:flex-start; gap:4px; }
+  .day-check { width:20px; height:20px; }
+  .md-input { width:90px; } /* タップしやすく */
+
+  /* ボタンのタップ領域 */
+  .btn { width:100%; min-height:40px; }
+
+  /* 追加フォームは縦積みフル幅 */
+  .row { flex-direction: column; align-items: stretch; }
+  .row .input, .row .btn { width:100%; }
+
+  /* モーダルは高さ優先でスクロール */
+  .modal .dialog { max-height:90vh; overflow:auto; }
+  .buy-list { max-height: 56vh; }
+  
+  /* 在籍顧問のグループ見出し/小計 行もカード風 */
+  tr.group-row td, tr.group-subtotal td {
+    display:block;
+    grid-template-columns: 1fr !important;
+    padding:10px !important;
+  }
+}
+
+/* ===== Mobile header layout fix ===== */
+@media (max-width: 720px) {
+  /* ヘッダー全体を折り返し可に */
+  .tabs-bar {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* 1行目：タブを横スクロールで全幅に */
+  header .tabs {
+    order: 1;
+    flex: 1 1 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px; /* スクロールバーの余白 */
+  }
+  header .tabs .tab-btn {
+    flex: 0 0 auto;      /* 折り返さず流せるように */
+    white-space: nowrap;
+  }
+
+  /* 2行目：未払バッジは右寄せで縦に積む */
+  #overall-unpaid,
+  #adviser-unpaid {
+    order: 2;            /* 同じ行に配置できるよう同順位 */
+    margin-left: auto;   /* 右端へ寄せる */
+    display: block;
+    width: max-content;  /* コンテンツ幅に縮める */
+  }
+  #adviser-unpaid {      /* 下の段へ少し間隔 */
+    margin-top: 6px;
+  }
+
+  /* 見切れ対策：ヘッダー内のテキスト微縮小 */
+  header h1 { font-size: 14px; }
+  .tab-btn { padding: 6px 10px; font-size: 12px; }
+}
+
+@media (max-width: 720px) {
+  /* 日付セル内の配置を横並びに */
+  .date-td .date-wrap {
+    flex-direction: row;     /* ← 縦並び→横並び */
+    justify-content: flex-start;
+    align-items: center;
+    gap: 6px;                /* チェックと日付の間隔 */
+    padding: 0;
+  }
+
+  .day-check { width: 18px; height: 18px; }
+  .md-input  { width: 72px; font-size: 12px; padding: 4px 6px; }
+}
+
+@media (max-width: 720px) {
+  /* 操作セルは横並びでボタンだけ見せる */
+  td[data-label="操作"] {
+    display: flex !important;
+    justify-content: flex-end;   /* 右寄せ */
+    align-items: center;
+    gap: 6px;
+  }
+  td[data-label="操作"]::before {
+    content: "";   /* ラベルを消す */
+  }
+  td[data-label="操作"] .btn {
+    width: auto;   /* 横幅いっぱいじゃなく適度なサイズ */
+    min-height: 32px;
+    padding: 4px 10px;
+  }
+}
+
+
+
 </style>
 </head>
 <body>
@@ -403,7 +567,7 @@ const TENANT_ID = "prod";
   const DD_RE = /^(0[1-9]|[12][0-9]|3[01])$/; // 在籍顧問用：日だけ
 
   // --- Firestore ドキュメント参照ショートカット ---
-  function panelDoc(panelId){
+  window.panelDoc = function(panelId){
     return db.collection('tenants').doc(TENANT_ID)
              .collection('panels').doc(panelId);
   }
@@ -622,8 +786,8 @@ async function renderTable(panelId){
         // 元データ上のインデックス（削除ボタン用）
         const originalIndex = data.indexOf(row);
 
- const dateCells = (row.dates||[]).map(function(cell,k){
-  // 在籍顧問は「DD」表示に統一（既存データがMM/DDやYYYY-MM-DDでもDDへ縮約）
+const dateCells = (row.dates||[]).map(function(cell,k){
+  // 在籍顧問は「DD」表示
   let v = '';
   if(cell){
     if(cell.md){
@@ -633,25 +797,27 @@ async function renderTable(panelId){
       v = String(cell.ymd).slice(-2);
     }
   }
-  return '<td class="date-td"><div class="date-wrap">\
-    <input type="text" inputmode="numeric" placeholder="DD" class="md-input" \
+  return '<td class="date-td" data-label="D'+(k+1)+'">\
+    <div class="date-wrap">\
+      <input type="text" inputmode="numeric" placeholder="DD" class="md-input" \
 data-panel="'+panelId+'" data-row="'+originalIndex+'" data-di="'+k+'" \
 value="'+esc(v)+'" maxlength="2" \
 pattern="(0[1-9]|[12][0-9]|3[01])">\
-  </div></td>';
+    </div></td>';
 }).join('');
-        const total  = calcAmount(panelId, row.dates);
-        const unpaid = calcUnpaid(panelId, row.dates, total);
-        groupTotal  += Number(total)||0;
+
+const total  = calcAmount(panelId, row.dates);
+const unpaid = calcUnpaid(panelId, row.dates, total);
+groupTotal  += Number(total)||0;
 
 htmlParts.push('<tr>\
-  <td>'+(htmlParts.length)+'</td>\
-  <td>'+esc(row.name)+'</td>\
-  <td>'+esc(row.staff||'')+'</td>\
+  <td data-label="#">'+(htmlParts.length)+'</td>\
+  <td data-label="氏名">'+esc(row.name)+'</td>\
+  <td data-label="担当">'+esc(row.staff||'')+'</td>\
   '+dateCells+'\
-  <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>\
-  <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
-  <td><button class="btn" data-action="del" data-index="'+originalIndex+'" data-panel="'+panelId+'">削除</button></td>\
+  <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
+  <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
+  <td data-label="操作"><button class="btn" data-action="del" data-index="'+originalIndex+'" data-panel="'+panelId+'">削除</button></td>\
 </tr>');
       });
 
@@ -664,36 +830,38 @@ htmlParts.push('<tr>\
     return;
   }
 
-  // === 通常タブ（タチバナ／ＯＺ／その他）は従来通り ===
-  tbody.innerHTML = data.map(function(row,i){
-    const buyCell = (!isAdv && isSB) ? '<td class="buy-cell">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
-    const dateCells = (row.dates||[]).map(function(cell,k){
-      const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
-      const checked = cell && cell.checked ? 'checked' : '';
-      const tdCls   = cell && cell.checked ? 'date-td is-checked' : 'date-td';
-      return '<td class="'+tdCls+'"><label class="date-wrap">\
-        <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
-        <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
+// === 通常タブ（タチバナ／ＯＺ／その他）は data-label を付与して描画 ===
+tbody.innerHTML = data.map(function(row,i){
+  const makeDateCells = (row.dates||[]).map(function(cell,k){
+    const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
+    const checked = cell && cell.checked ? 'checked' : '';
+    const tdCls   = cell && cell.checked ? 'date-td is-checked' : 'date-td';
+    const label   = 'D'+(k+1);
+    return '<td class="'+tdCls+'" data-label="'+label+'"><label class="date-wrap">\
+      <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
+      <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
 data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" value="'+esc(v)+'" maxlength="5" \
 pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
-      </label></td>';
-    }).join('');
-
-    const total  = calcAmount(panelId, row.dates);
-    const unpaid = calcUnpaid(panelId, row.dates, total);
-    const remainCell = (!isAdv && isSB) ? '<td class="remain-cell">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
-
-    return '<tr>\
-      <td>'+(i+1)+'</td>\
-      <td>'+esc(row.name)+'</td>\
-      <td>'+esc(row.staff||'')+'</td>\
-      '+buyCell+dateCells+'\
-      <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>\
-      '+remainCell+'\
-      <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
-      <td><button class="btn" data-action="del" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
-    </tr>';
+    </label></td>';
   }).join('');
+
+  const total  = calcAmount(panelId, row.dates);
+  const unpaid = calcUnpaid(panelId, row.dates, total);
+
+  const buyCell    = (!isAdv && isSB) ? '<td class="buy-cell" data-label="買取金額">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
+  const remainCell = (!isAdv && isSB) ? '<td class="remain-cell" data-label="残金">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
+
+  return '<tr>\
+    <td data-label="#">'+(i+1)+'</td>\
+    <td data-label="氏名">'+esc(row.name)+'</td>\
+    <td data-label="担当">'+esc(row.staff||'')+'</td>\
+    '+buyCell+ makeDateCells +'\
+    <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
+    '+remainCell+'\
+    <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
+    <td data-label="操作"><button class="btn" data-action="del" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
+  </tr>';
+}).join('');
 
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
@@ -704,13 +872,28 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
   // フォーム初期化
 async function initForm(form){
   const panelId = form.dataset.panel;
+
+  // === 在籍顧問フォームなら最後に選択したグループを復元 ===
+  if (panelId === "tab4-sub1") {
+    const groupEl = form.querySelector('select[name="group"]');
+    if (groupEl) {
+      const lastGroup = localStorage.getItem("lastAdvGroup");
+      if (lastGroup) groupEl.value = lastGroup;
+      // 選択変更ごとに保存
+      groupEl.addEventListener("change", () => {
+        localStorage.setItem("lastAdvGroup", groupEl.value);
+      });
+    }
+  }
+
   renderTable(panelId);
+
   form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const nameEl  = form.querySelector('input[name="name"]');
     const buyEl   = form.querySelector('input[name="buy"]');
     const groupEl = form.querySelector('select[name="group"]');
-    const staffEl = form.querySelector('input[name="staff"]');   // ← 追加
+    const staffEl = form.querySelector('input[name="staff"]');
 
     const name = (nameEl && nameEl.value || "").trim();
     if(!name) return;
@@ -723,16 +906,29 @@ async function initForm(form){
       dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
     };
     if(panelId.endsWith('sub2') && !isAdviser(panelId)) row.buy = buy;
-    if(isAdviser(panelId) && groupEl) row.group = String(groupEl.value || "");
-    if(staffEl) row.staff = String(staffEl.value || "");         // ← 追加
+    if(isAdviser(panelId) && groupEl) {
+      row.group = String(groupEl.value || "");
+      localStorage.setItem("lastAdvGroup", row.group); // ← 追加：submit時にも保存
+    }
+    if(staffEl) row.staff = String(staffEl.value || "");
 
     data.push(row);
     saveNames(panelId, data);
+
     form.reset();
     renderTable(panelId);
+
+    // 氏名入力欄にフォーカス戻す
     if(nameEl) nameEl.focus();
+
+    // === form.reset()で<select>も初期化されるので復元 ===
+    if (isAdviser(panelId) && groupEl) {
+      const lastGroup = localStorage.getItem("lastAdvGroup");
+      if (lastGroup) groupEl.value = lastGroup;
+    }
   });
 }
+
 document.querySelectorAll('form.name-form').forEach(initForm);
 document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
 
@@ -983,7 +1179,7 @@ function subscribePanel(panelId) {
 // 初期化時に全部登録
 MAIN_TABS.forEach(tab => {
   subscribePanel(tab+'-sub1');
-  subscribePanel(tab+'-sub2');
+  if (tab !== 'tab4') subscribePanel(tab+'-sub2');
 });
 
 </script>
