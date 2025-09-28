@@ -1080,6 +1080,31 @@ async function initForm(form){
   });
 }
 
+// 「買取終了」→ アクティブへ戻す
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="restore"]');
+  if(!btn) return;
+
+  const panelId = btn.dataset.panel;         // 例: "tab1-sub2"
+  const idx     = Number(btn.dataset.index); // 買取終了側の行インデックス
+
+  // 完了一覧（買取終了）から対象を取得
+  const completed = normalizeData(await readCompleted(panelId));
+  const row = completed[idx];
+  if(!row) return;
+
+  // アクティブ側へ移動
+  const active = normalizeData(await readNames(panelId));
+  active.push(row);
+  completed.splice(idx, 1);
+
+  // 保存 & 再描画
+  saveNames(panelId, active);
+  saveCompleted(panelId, completed);
+  renderTable(panelId);
+  renderCompletedTable(panelId);
+});
+
 document.querySelectorAll('form.name-form').forEach(initForm);
 document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
 
