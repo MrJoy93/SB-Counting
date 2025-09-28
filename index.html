@@ -970,6 +970,22 @@ tbody.innerHTML = data.map((row,i)=>{
   MAIN_TABS.forEach(updateMainUnpaid);
   updateOverallUnpaid();
 
+  // パネルごとにリアルタイム監視
+function subscribePanel(panelId) {
+  panelDoc(panelId).onSnapshot((doc) => {
+    if(doc.exists){
+      const data = doc.data();
+      renderTable(panelId, normalizeData(data.names||[]));
+    }
+  });
+}
+
+// 初期化時に全部登録
+MAIN_TABS.forEach(tab => {
+  subscribePanel(tab+'-sub1');
+  subscribePanel(tab+'-sub2');
+});
+
 </script>
 </body>
 </html>
