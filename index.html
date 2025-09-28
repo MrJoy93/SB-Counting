@@ -618,8 +618,10 @@ const TENANT_ID = "prod";
 (function(){
   window.MAIN_TABS = ["tab1","tab2","tab3","tab4"];
   window.fmtJPY = new Intl.NumberFormat('ja-JP');
-  const MD_RE = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/;
+  const MD_RE = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])$/;
   const DD_RE = /^(0[1-9]|[12][0-9]|3[01])$/; // 在籍顧問用：日だけ
+  // 3～4桁の「スラなし」(927, 0927, 1127, 0105 など)
+  const MD_NUM_RE = /^\d{3,4}$/;
 
   // --- Firestore ドキュメント参照ショートカット ---
   window.panelDoc = function(panelId){
@@ -661,11 +663,39 @@ const TENANT_ID = "prod";
     c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
   ); }
 
-  function parseMD(txt){
-    const t=(txt||"").trim();
-    const m=t.match(MD_RE);
-    return m? {mm:m[1],dd:m[2]}:null;
+function parseMD(txt){
+  const t = String(txt||"").trim();
+
+  // ① スラなし 3～4桁（927, 0927 など）
+  if(MD_NUM_RE.test(t)){
+    const digits = t; // 3 or 4 digits
+    let mm, dd;
+    if(digits.length === 3){
+      // 例: 927 -> 9 / 27
+      mm = digits.slice(0,1);
+      dd = digits.slice(1);
+    }else{
+      // 例: 0927, 1127 -> 09 / 27, 11 / 27
+      mm = digits.slice(0,2);
+      dd = digits.slice(2);
+    }
+    const m = Number(mm), d = Number(dd);
+    if(m>=1 && m<=12 && d>=1 && d<=31){
+      return { mm: String(m).padStart(2,'0'), dd: String(d).padStart(2,'0') };
+    }
+    return null;
   }
+
+  // ② スラあり（9/7, 09/07 など）→ 02桁化して返す
+  const m = t.match(MD_RE);
+  if(m){
+    const mm = String(Number(m[1])).padStart(2,'0');
+    const dd = String(Number(m[2])).padStart(2,'0');
+    return { mm, dd };
+  }
+
+  return null;
+}
 
   window.isoToMD = function(iso){
     if(!iso) return "";
@@ -710,6 +740,54 @@ const TENANT_ID = "prod";
       return { name, staff, buy, group, dates };
     });
   }
+
+  // 値確定：在籍顧問はDDのみ保存（ymdは空）、その他はMM/DD→YYYY-MM-DDへ
+document.addEventListener('change', async (e)=>{
+  const el = e.target.closest('input.md-input'); if(!el) return;
+  const panelId = el.dataset.panel; const r=Number(el.dataset.row), k=Number(el.dataset.di);
+  const data = normalizeData(await readNames(panelId)); if(!data[r]) return;
+  const raw = (el.value||"").trim();
+  const isAdv = isAdviser(panelId);
+
+  // ★ 次にフォーカスするターゲット（自然なTab順：同じ行の次→行送り）
+  const totalSlots = (data[r].dates && data[r].dates.length) ? data[r].dates.length : 10;
+  const nextK = (k + 1 < totalSlots) ? (k + 1) : 0;
+  const nextR = (k + 1 < totalSlots) ? r : (r + 1);
+
+  // 空入力（削除）の処理
+  if(raw === ""){
+    el.classList.remove('invalid');
+    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+    data[r].dates[k] = { md:"", ymd:"", checked: wasChecked };
+    saveNames(panelId, data);
+    renderTable(panelId);
+    // ★ 再描画後に次セルへ
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+    return;
+  }
+
+  if(isAdv){
+    // 在籍顧問：DDのみ
+    if(!DD_RE.test(raw)){ el.classList.add('invalid'); return; }
+    el.classList.remove('invalid');
+    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+    data[r].dates[k] = { md: raw, ymd: "", checked: wasChecked };
+    saveNames(panelId, data);
+    renderTable(panelId);
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+  }else{
+    // 通常：MM/DD → YYYY-MM-DD
+    const md = parseMD(raw);
+    if(!md){ el.classList.add('invalid'); return; }
+    el.classList.remove('invalid');
+    const yyyy = inferYear();
+    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+    data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
+    saveNames(panelId, data);
+    renderTable(panelId);
+    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
+  }
+});
 
 })(); // IIFE終わり
 
@@ -927,58 +1005,6 @@ updateFilterOptions(panelId, data);
 applyNameFilter(panelId);
 }
 
-function applyNameFilter(panelId){
-  const sel   = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
-  const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
-  if(!sel || !table) return;
-
-  const keyword = sel.value.trim();
-  const trs = table.querySelectorAll('tbody tr');
-
-  trs.forEach(tr=>{
-    const nameTd = tr.querySelector('td[data-label="氏名"]');
-    if(!nameTd){
-      // 在籍顧問の「グループ見出し／小計」行は、絞り込み中は非表示
-      tr.style.display = (keyword==="" ? "" : "none");
-      return;
-    }
-    const text = (nameTd.textContent||"").trim();
-    tr.style.display = (keyword==="" || text===keyword) ? "" : "none";
-  });
-}
-
-document.addEventListener('change',(e)=>{
-  const sel = e.target.closest('.filter-select');
-  if(!sel) return;
-  applyNameFilter(sel.dataset.panel);
-});
-
-function applyNameFilter(panelId){
-  const sel   = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
-  const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
-  if(!sel || !table) return;
-  const keyword = sel.value;
-  const trs = table.querySelectorAll('tbody tr');
-
-  trs.forEach(tr=>{
-    const nameTd = tr.querySelector('td[data-label="氏名"]');
-    if(!nameTd){
-      // グループ見出し/小計は、フィルタ中は非表示にする
-      tr.style.display = (keyword==="" ? "" : "none");
-      return;
-    }
-    const text = (nameTd.textContent||"").trim();
-    tr.style.display = (keyword==="" || text===keyword) ? "" : "none";
-  });
-}
-
-// ドロップダウンが変わったら適用
-document.addEventListener('change',(e)=>{
-  const sel = e.target.closest('.filter-select');
-  if(!sel) return;
-  applyNameFilter(sel.dataset.panel);
-});
-
 function updateFilterOptions(panelId, data){
   const sel = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
   if(!sel) return;
@@ -999,25 +1025,31 @@ function updateFilterOptions(panelId, data){
   }
 }
 
-document.addEventListener('change', (e)=>{
-  const sel = e.target.closest('.filter-select');
-  if(!sel) return;
-  const panelId = sel.dataset.panel;
-  const keyword = sel.value;
+function applyNameFilter(panelId){
+  const sel   = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
   const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
-  if(!table) return;
+  if(!sel || !table) return;
+
+  const keyword = sel.value.trim();
   const trs = table.querySelectorAll('tbody tr');
 
   trs.forEach(tr=>{
     const nameTd = tr.querySelector('td[data-label="氏名"]');
-    if(!nameTd) return;
-    const text = (nameTd.textContent||"").trim();
-    if(keyword==="" || text===keyword){
-      tr.style.display = "";
-    } else {
-      tr.style.display = "none";
+    if(!nameTd){
+      // 在籍顧問の「グループ見出し／小計」行は、絞り込み中は非表示
+      tr.style.display = (keyword==="" ? "" : "none");
+      return;
     }
+    const text = (nameTd.textContent||"").trim();
+    tr.style.display = (keyword==="" || text===keyword) ? "" : "none";
   });
+}
+
+// ドロップダウンが変わったら適用
+document.addEventListener('change',(e)=>{
+  const sel = e.target.closest('.filter-select');
+  if(!sel) return;
+  applyNameFilter(sel.dataset.panel);
 });
 
   // フォーム初期化
@@ -1202,54 +1234,6 @@ document.addEventListener('click', async (e)=>{   // ★ async を追加
     }
     renderTable(panelId); renderCompletedTable(panelId);
   });
-
-// 値確定：在籍顧問はDDのみ保存（ymdは空）、その他はMM/DD→YYYY-MM-DDへ
-document.addEventListener('change', async (e)=>{
-  const el = e.target.closest('input.md-input'); if(!el) return;
-  const panelId = el.dataset.panel; const r=Number(el.dataset.row), k=Number(el.dataset.di);
-  const data = normalizeData(await readNames(panelId)); if(!data[r]) return;
-  const raw = (el.value||"").trim();
-  const isAdv = isAdviser(panelId);
-
-  // ★ 次にフォーカスするターゲット（自然なTab順：同じ行の次→行送り）
-  const totalSlots = (data[r].dates && data[r].dates.length) ? data[r].dates.length : 10;
-  const nextK = (k + 1 < totalSlots) ? (k + 1) : 0;
-  const nextR = (k + 1 < totalSlots) ? r : (r + 1);
-
-  // 空入力（削除）の処理
-  if(raw === ""){
-    el.classList.remove('invalid');
-    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
-    data[r].dates[k] = { md:"", ymd:"", checked: wasChecked };
-    saveNames(panelId, data);
-    renderTable(panelId);
-    // ★ 再描画後に次セルへ
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
-    return;
-  }
-
-  if(isAdv){
-    // 在籍顧問：DDのみ
-    if(!DD_RE.test(raw)){ el.classList.add('invalid'); return; }
-    el.classList.remove('invalid');
-    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
-    data[r].dates[k] = { md: raw, ymd: "", checked: wasChecked };
-    saveNames(panelId, data);
-    renderTable(panelId);
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
-  }else{
-    // 通常：MM/DD → YYYY-MM-DD
-    const md = parseMD(raw);
-    if(!md){ el.classList.add('invalid'); return; }
-    el.classList.remove('invalid');
-    const yyyy = inferYear();
-    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
-    data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
-    saveNames(panelId, data);
-    renderTable(panelId);
-    setTimeout(()=>{ focusCell(panelId, nextR, nextK); }, 0);
-  }
-});
 
   // メインタブ切替
   document.querySelectorAll('header .tab-btn').forEach((btn)=>{
