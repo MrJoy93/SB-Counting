@@ -80,6 +80,29 @@
   border-top:1px dashed rgba(0,245,255,.35);
 }
 
+/* 見出し行を左右レイアウトにして、バッジ群を右端へ */
+.heading{
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;        /* 幅が狭い時は折り返し */
+  gap: 8px;               /* 適度な余白 */
+}
+
+/* 最初のバッジで“右側スペース”を埋める＝以降のバッジを右端に寄せる */
+.heading .main-unpaid:first-of-type{
+  margin-left: auto;      /* これでバッジ群が右寄せになる */
+}
+
+/* バッジ同士の間隔（必要なら） */
+.heading .main-unpaid{
+  margin-left: 6px;
+}
+
+/* スマホ等で2段になった時、見出しとバッジの間を少し空ける（任意） */
+@media (max-width: 480px){
+
+}
+
 /* スマホ画面の調整 */
 @media (max-width: 600px) {
   header h1 { font-size: 14px; }
@@ -98,6 +121,11 @@
   /* テーブルは横スクロールを前提に */
   table { font-size: 12px; }
   th, td { padding:4px; }
+
+    .heading{
+    row-gap: 6px;
+  }
+
 }
 
 nav.tabs {
@@ -262,8 +290,11 @@ nav.tabs {
       <button class="tab-btn" aria-selected="false" data-tab="tab3">その他</button>
       <button class="tab-btn" aria-selected="false" data-tab="tab4">在籍顧問</button>
     </nav>
-    <div class="overall-unpaid" id="overall-unpaid" aria-live="polite">総未払合計: ¥0</div>
-    <div class="overall-unpaid" id="adviser-unpaid" aria-live="polite">顧問未払合計: ¥0</div>
+<div class="overall-unpaid" id="overall-unpaid" aria-live="polite">足代未払合計: ¥0</div>
+<div class="overall-unpaid" id="sb-unpaid" aria-live="polite">SB未払合計: ¥0</div>
+<div class="overall-unpaid" id="sb-progress" aria-live="polite">SB作成中: ¥0</div>
+<div class="overall-unpaid" id="overall-total"   aria-live="polite">総合計: ¥0</div>
+<div class="overall-unpaid" id="adviser-unpaid" aria-live="polite">顧問未払合計: ¥0</div>
   </div>
 </header>
 
@@ -272,7 +303,10 @@ nav.tabs {
   <section id="tab1" class="panel active">
     <div class="heading">
       <h2>タチバナ</h2>
-      <div class="main-unpaid" data-main="tab1" aria-live="polite">未払合計: ¥0</div>
+         <div class="main-unpaid" data-main="tab1" data-kind="foot"     aria-live="polite">足代未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab1" data-kind="sb"       aria-live="polite">SB未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab1" data-kind="progress" aria-live="polite">SB作成中: ¥0</div>
+         <div class="main-unpaid" data-main="tab1" data-kind="total">総合計: ¥0</div>
     </div>
     <nav class="tabs" aria-label="タチバナ Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab1-sub1">足代</button>
@@ -351,7 +385,10 @@ nav.tabs {
   <section id="tab2" class="panel">
     <div class="heading">
       <h2>ＯＺ</h2>
-      <div class="main-unpaid" data-main="tab2" aria-live="polite">未払合計: ¥0</div>
+         <div class="main-unpaid" data-main="tab2" data-kind="foot"     aria-live="polite">足代未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab2" data-kind="sb"       aria-live="polite">SB未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab2" data-kind="progress" aria-live="polite">SB作成中: ¥0</div>
+         <div class="main-unpaid" data-main="tab2" data-kind="total">総合計: ¥0</div>
     </div>
     <nav class="tabs" aria-label="ＯＺ Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab2-sub1">足代</button>
@@ -428,7 +465,10 @@ nav.tabs {
   <section id="tab3" class="panel">
     <div class="heading">
       <h2>その他</h2>
-      <div class="main-unpaid" data-main="tab3" aria-live="polite">未払合計: ¥0</div>
+         <div class="main-unpaid" data-main="tab3" data-kind="foot"     aria-live="polite">足代未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab3" data-kind="sb"       aria-live="polite">SB未払: ¥0</div>
+         <div class="main-unpaid" data-main="tab3" data-kind="progress" aria-live="polite">SB作成中: ¥0</div>
+         <div class="main-unpaid" data-main="tab3" data-kind="total">総合計: ¥0</div>
     </div>
     <nav class="tabs" aria-label="その他 Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab3-sub1">足代</button>
@@ -846,40 +886,147 @@ document.addEventListener('change', async (e)=>{
     }, 0);
   }
 
-async function updateMainUnpaid(mainId){
-  const badge = document.querySelector('.main-unpaid[data-main="'+mainId+'"]');
-  if(!badge) return;
+  // 足代（sub1）の未払合計を合算（tab1,tab2,tab3対象）
+async function sumAllFootUnpaid(){
+  let sum = 0;
+  for (const mid of MAIN_TABS) {
+    if (mid === 'tab4') continue; // 顧問は別集計
+    const d1 = normalizeData(await readNames(mid+'-sub1'));
+    sum += sumUnpaidForData(mid+'-sub1', d1);
+  }
+  return sum;
+}
+
+// SB未払合計：各SBタブ（tab1-3 sub2）のうち、10日すべて「日付記入あり」の行だけを対象に未払を合計
+async function sumAllSbUnpaidFull(){
+  let sum = 0;
+  for (const mid of MAIN_TABS) {
+    if (mid === 'tab4') continue;
+    const d2 = normalizeData(await readNames(mid+'-sub2'));
+    for (const row of d2) {
+      const dates = row.dates || [];
+      const filled = dates.filter(d => d && d.md).length; // 記入済みスロット数
+      if (filled === 10) {
+        const total  = calcAmount(mid+'-sub2', dates);
+        const unpaid = calcUnpaid(mid+'-sub2', dates, total);
+        sum += unpaid;
+      }
+    }
+  }
+  return sum;
+}
+
+// SB作成中：各SBタブ（tab1-3 sub2）の「10日コンプ以外」の行を対象に、合計金額(total)を合計
+async function sumAllSbInProgressTotal(){
+  let sum = 0;
+  for (const mid of MAIN_TABS) {
+    if (mid === 'tab4') continue;
+    const d2 = normalizeData(await readNames(mid+'-sub2'));
+    for (const row of d2) {
+      const dates = row.dates || [];
+      const filled = dates.filter(d => d && d.md).length;
+      if (filled < 10) {
+        sum += calcAmount(mid+'-sub2', dates);
+      }
+    }
+  }
+  return sum;
+}
+
+// 足代未払（sub1のみ）
+async function sumFootUnpaidOf(mainId){
   const d1 = normalizeData(await readNames(mainId+'-sub1'));
+  return sumUnpaidForData(mainId+'-sub1', d1);
+}
+
+// SB未払（sub2）：10日分すべて日付が記入されている行だけ対象（未払金額の合計）
+async function sumSbUnpaidFullOf(mainId){
   const d2 = normalizeData(await readNames(mainId+'-sub2'));
-  const sum = sumUnpaidForData(mainId+'-sub1', d1) + sumUnpaidForData(mainId+'-sub2', d2);
-  badge.textContent = '未払合計: ¥'+fmtJPY.format(sum);
+  let sum = 0;
+  for (const row of d2) {
+    const dates = row.dates || [];
+    const filled = dates.filter(d => d && d.md).length;
+    if (filled === 10) {
+      const total  = calcAmount(mainId+'-sub2', dates);
+      const unpaid = calcUnpaid(mainId+'-sub2', dates, total);
+      sum += unpaid;
+    }
+  }
+  return sum;
+}
+
+// SB作成中（sub2）：10日コンプ以外の行の「合計金額(total)」を合計
+async function sumSbInProgressTotalOf(mainId){
+  const d2 = normalizeData(await readNames(mainId+'-sub2'));
+  let sum = 0;
+  for (const row of d2) {
+    const dates = row.dates || [];
+    const filled = dates.filter(d => d && d.md).length;
+    if (filled < 10) sum += calcAmount(mainId+'-sub2', dates);
+  }
+  return sum;
+}
+
+async function updateMainUnpaid(mainId){
+  const footEl = document.querySelector('.main-unpaid[data-main="'+mainId+'"][data-kind="foot"]');
+  const sbEl   = document.querySelector('.main-unpaid[data-main="'+mainId+'"][data-kind="sb"]');
+  const prEl   = document.querySelector('.main-unpaid[data-main="'+mainId+'"][data-kind="progress"]');
+  // ★ 追加：タブ内の総合計バッジ
+  const totEl  = document.querySelector('.main-unpaid[data-main="'+mainId+'"][data-kind="total"]');
+
+  if (mainId === 'tab4') {
+    const badge = document.querySelector('.main-unpaid[data-main="tab4"]');
+    if (badge) {
+      const d1 = normalizeData(await readNames('tab4-sub1'));
+      const sum = sumUnpaidForData('tab4-sub1', d1);
+      badge.textContent = '未払合計: ¥' + fmtJPY.format(sum);
+    }
+    await updateOverallUnpaid();
+    return;
+  }
+
+  const [foot, sbFull, sbProg] = await Promise.all([
+    sumFootUnpaidOf(mainId),
+    sumSbUnpaidFullOf(mainId),
+    sumSbInProgressTotalOf(mainId),
+  ]);
+
+  if (footEl) footEl.textContent = '足代未払: ¥'   + fmtJPY.format(foot);
+  if (sbEl)   sbEl.textContent   = 'SB未払: ¥'     + fmtJPY.format(sbFull);
+  if (prEl)   prEl.textContent   = 'SB作成中: ¥'   + fmtJPY.format(sbProg);
+
+  // ★ 追加：タブ内の総合計（足代＋SB未払＋SB作成中）
+  if (totEl)  totEl.textContent  = '総合計: ¥'     + fmtJPY.format(foot + sbFull + sbProg);
+
   await updateOverallUnpaid();
 }
 
 async function updateOverallUnpaid(){
-  const grandEl = document.getElementById('overall-unpaid');
-  const advEl   = document.getElementById('adviser-unpaid');
-  if(!grandEl) return;
+  const footEl  = document.getElementById('overall-unpaid'); // 足代未払合計
+  const sbEl    = document.getElementById('sb-unpaid');      // SB未払合計
+  const progEl  = document.getElementById('sb-progress');    // SB作成中
+  const advEl   = document.getElementById('adviser-unpaid'); // 顧問未払合計
+  const totEl   = document.getElementById('overall-total');  // 総合計
+  if(!footEl) return;
 
-  let grand = 0;
-  let adviserSum = 0;
+  // 個別集計
+  const footSum      = await sumAllFootUnpaid();        // 足代
+  const sbFullUnpaid = await sumAllSbUnpaidFull();      // SB（10日分記入あり）
+  const sbInProgress = await sumAllSbInProgressTotal(); // SB作成中（10日未満）
+  const dAdv = normalizeData(await readNames('tab4-sub1'));
+  const adviserSum = sumUnpaidForData('tab4-sub1', dAdv);
 
-  for(const mid of MAIN_TABS){
-    const d1 = normalizeData(await readNames(mid+'-sub1'));
-    const d2 = normalizeData(await readNames(mid+'-sub2'));
+  // 表示
+  footEl.textContent = '足代未払合計: ¥' + fmtJPY.format(footSum);
+  if (sbEl)   sbEl.textContent   = 'SB未払合計: ¥' + fmtJPY.format(sbFullUnpaid);
+  if (progEl) progEl.textContent = 'SB作成中: ¥'   + fmtJPY.format(sbInProgress);
+  if (advEl)  advEl.textContent  = '顧問未払合計: ¥' + fmtJPY.format(adviserSum);
 
-    if(mid === 'tab4'){
-      adviserSum += sumUnpaidForData(mid+'-sub1', d1);
-    } else {
-      grand += sumUnpaidForData(mid+'-sub1', d1) + sumUnpaidForData(mid+'-sub2', d2);
-    }
-  }
-
-  grandEl.textContent = '総未払合計: ¥' + fmtJPY.format(grand);
-  if(advEl){
-    advEl.textContent = '顧問未払合計: ¥' + fmtJPY.format(adviserSum);
-  }
+  // 総合計（足代＋SB未払＋SB作成中）
+  const grand = footSum + sbFullUnpaid + sbInProgress;
+  if (totEl) totEl.textContent = '総合計: ¥' + fmtJPY.format(grand);
 }
+
 
   // テーブル描画
 async function renderTable(panelId){
