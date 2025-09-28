@@ -601,8 +601,15 @@ const TENANT_ID = "prod";
   const sel = 'input, select, textarea, button';
   root.addEventListener('keydown', (e)=>{
     if(e.key !== 'Enter') return;
+    // ★ md-input は「確定(change)→再描画→focusCell」に任せる
+    if (e.target && e.target.classList && e.target.classList.contains('md-input')) {
+     e.preventDefault();
+      e.target.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
     if(e.target && e.target.tagName === 'TEXTAREA') return; // textareaは改行を優先
     e.preventDefault();
+
     const focusables = Array.from(root.querySelectorAll(sel))
       .filter(el => !el.disabled && el.type !== 'hidden' && el.offsetParent !== null);
     const i = focusables.indexOf(e.target);
@@ -1138,7 +1145,7 @@ document.addEventListener('click', async (e)=>{
 });
 
 document.querySelectorAll('form.name-form').forEach(initForm);
-document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
+document.querySelectorAll('section.panel').forEach(enableEnterTabbing);
 
 
   // 削除（アクティブ）※確認ダイアログ付き
