@@ -702,10 +702,10 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
 
 
   // フォーム初期化
-function initForm(form){
+async function initForm(form){
   const panelId = form.dataset.panel;
   renderTable(panelId);
-  form.addEventListener('submit', (e)=>{
+  form.addEventListener('submit', async (e)=>{
     e.preventDefault();
     const nameEl  = form.querySelector('input[name="name"]');
     const buyEl   = form.querySelector('input[name="buy"]');
@@ -716,7 +716,7 @@ function initForm(form){
     if(!name) return;
 
     const buy  = Math.max(0, Number(buyEl && buyEl.value || 0));
-    const data = normalizeData(readNames(panelId));
+    const data = normalizeData(await readNames(panelId));
 
     const row = {
       name,
@@ -738,12 +738,12 @@ document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
 
 
   // 削除（アクティブ）※確認ダイアログ付き
-  document.addEventListener('click', (e)=>{
+  document.addEventListener('click', async (e)=>{
     const btn = e.target.closest('button[data-action="del"]');
     if(!btn) return;
     const panelId = btn.dataset.panel; 
     const idx = Number(btn.dataset.index);
-    const data = normalizeData(readNames(panelId));
+    const data = normalizeData(await readNames(panelId));
     const row = data[idx];
     const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
     if(!window.confirm(`${name} を削除します。よろしいですか？`)) return;
@@ -769,13 +769,13 @@ document.addEventListener('click', async (e)=>{   // ★ async を追加
 });
 
   // モーダル（買取金額一括編集：tab1-3 の SB）
-  function openBuyEditor(panelId){
+  async function openBuyEditor(panelId){
     const modal = document.getElementById('buy-editor-modal');
     const list = modal.querySelector('.buy-list');
     const title = modal.querySelector('[data-title]');
     title.textContent = '買取金額を編集（'+panelId+'）';
     list.innerHTML = '';
-    const data = normalizeData(readNames(panelId));
+    const data = normalizeData(await readNames(panelId));
     data.forEach((row, i)=>{
       const nameDiv = document.createElement('div'); nameDiv.className='name'; nameDiv.textContent = row.name || ('No.'+(i+1));
       const inp = document.createElement('input'); inp.type='number'; inp.min='0'; inp.value=Number(row.buy)||0; inp.dataset.index=String(i);
@@ -784,24 +784,24 @@ document.addEventListener('click', async (e)=>{   // ★ async を追加
     modal.dataset.panel = panelId;
     modal.classList.add('show');
   }
-  document.addEventListener('click', (e)=>{
+  document.addEventListener('click', async (e)=>{
     const editBtn = e.target.closest('.edit-buy-btn');
     if(editBtn){ openBuyEditor(editBtn.dataset.panel); return; }
     const closeBtn = e.target.closest('[data-close]');
     if(closeBtn){ document.getElementById('buy-editor-modal').classList.remove('show'); return; }
   });
-  document.addEventListener('click', (e)=>{
+  document.addEventListener('click', async (e)=>{
     const saveBtn = e.target.closest('[data-save]');
     if(!saveBtn) return;
     const modal = document.getElementById('buy-editor-modal');
     const panel = modal.dataset.panel; if(!panel) return;
-    const data = normalizeData(readNames(panel));
+    const data = normalizeData(await readNames(panel));
     const inputs = modal.querySelectorAll('.buy-list input');
     inputs.forEach((inp)=>{ const idx=Number(inp.dataset.index); if(data[idx]) data[idx].buy=Math.max(0, Number(inp.value)||0); });
     saveNames(panel, data); modal.classList.remove('show'); renderTable(panel);
   });
   // modal close gestures
-  document.addEventListener('click', (e)=>{
+  document.addEventListener('click', async (e)=>{
     const modal = document.getElementById('buy-editor-modal');
     if(!modal.classList.contains('show')) return;
     if(e.target.classList.contains('backdrop')) modal.classList.remove('show');
@@ -811,17 +811,17 @@ document.addEventListener('click', async (e)=>{   // ★ async を追加
   });
 
   // チェック切替（在籍以外のみチェックあり & 完了移動）
-  document.addEventListener('change', (e)=>{
+  document.addEventListener('change', async (e)=>{
     const cb = e.target.closest('input.day-check');
     if(!cb) return;
     const panelId = cb.dataset.panel; if(isAdviser(panelId)) return; // 在籍はチェックボックス自体なし
     const r=Number(cb.dataset.row), k=Number(cb.dataset.di);
-    const data = normalizeData(readNames(panelId)); if(!data[r]) return;
+    const data = normalizeData(await readNames(panelId)); if(!data[r]) return;
     data[r].dates[k].checked = cb.checked;
 
     const checkedCount = (data[r].dates||[]).filter(d=> !!d.checked).length;
     if(checkedCount===10){
-      const completed = normalizeData(readCompleted(panelId));
+      const completed = normalizeData(await readCompleted(panelId));
       completed.push(data[r]);
       data.splice(r,1);
       saveNames(panelId, data); saveCompleted(panelId, completed);
@@ -832,10 +832,10 @@ document.addEventListener('click', async (e)=>{   // ★ async を追加
   });
 
 // 値確定：在籍顧問はDDのみ保存（ymdは空）、その他はMM/DD→YYYY-MM-DDへ
-document.addEventListener('change', (e)=>{
+document.addEventListener('change', async (e)=>{
   const el = e.target.closest('input.md-input'); if(!el) return;
   const panelId = el.dataset.panel; const r=Number(el.dataset.row), k=Number(el.dataset.di);
-  const data = normalizeData(readNames(panelId)); if(!data[r]) return;
+  const data = normalizeData(await readNames(panelId)); if(!data[r]) return;
   const raw = (el.value||"").trim();
   const isAdv = isAdviser(panelId);
 
