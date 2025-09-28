@@ -84,7 +84,7 @@
 </head>
 <body>
 <header>
-  <h1>SB-Counting Ver.1.1</h1>
+  <h1>SB-Counting Ver.2.0</h1>
   <div class="tabs-bar">
     <nav class="tabs" aria-label="Main Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab1">タチバナ</button>
@@ -341,16 +341,44 @@
   </div>
 </div>
 
+<!-- Firebase compat SDK（v10系） -->
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.1/firebase-firestore-compat.js"></script>
+
 <script>
 
-function focusCell(panelId, r, k){
+// ★ あなたのプロジェクトの構成値で置き換えてください
+const firebaseConfig = {
+  apiKey: "AIzaSyCPO_USyv_nyATTSzB88ChJD7Jg0OuHdrg",
+  authDomain: "sb-counting.firebaseapp.com",
+  projectId: "sb-counting",
+  storageBucket: "sb-counting.firebasestorage.app",
+  messagingSenderId: "336851836369",
+  appId: "1:336851836369:web:cac53c9aa8711831ead4f0",
+  measurementId: "G-N8NBNC720Y"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db   = firebase.firestore();
+
+// 匿名ログイン
+auth.signInAnonymously().catch(console.error);
+
+// テナントIDを固定（今回は "prod"）
+const TENANT_ID = "prod";
+
+
+
+  function focusCell(panelId, r, k){
   const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+r+'"][data-di="'+k+'"]';
   const el = document.querySelector(sel);
   if(el){ el.focus(); if(el.select) el.select(); }
-}
+  }
 
   // Enterで次要素に移動（最後ならsubmit）
-function enableEnterTabbing(root){
+  function enableEnterTabbing(root){
   const sel = 'input, select, textarea, button';
   root.addEventListener('keydown', (e)=>{
     if(e.key !== 'Enter') return;
@@ -369,56 +397,102 @@ function enableEnterTabbing(root){
 }
 
 (function(){
-  const MAIN_TABS = ["tab1","tab2","tab3","tab4"];
-  const fmtJPY = new Intl.NumberFormat('ja-JP');
+  window.MAIN_TABS = ["tab1","tab2","tab3","tab4"];
+  window.fmtJPY = new Intl.NumberFormat('ja-JP');
   const MD_RE = /^(0[1-9]|1[0-2])\/(0[1-9]|[12][0-9]|3[01])$/;
   const DD_RE = /^(0[1-9]|[12][0-9]|3[01])$/; // 在籍顧問用：日だけ
 
-  function keyFor(panelId){ return 'names_' + panelId; }
-  function readNames(panelId){ try{ return JSON.parse(localStorage.getItem(keyFor(panelId))||"[]"); }catch{ return []; } }
-  function saveNames(panelId, arr){ try{ localStorage.setItem(keyFor(panelId), JSON.stringify(arr)); }catch{} }
+  // --- Firestore ドキュメント参照ショートカット ---
+  function panelDoc(panelId){
+    return db.collection('tenants').doc(TENANT_ID)
+             .collection('panels').doc(panelId);
+  }
 
-  function keyCompleted(panelId){ return 'completed_'+panelId; }
-  function readCompleted(panelId){ try{ return JSON.parse(localStorage.getItem(keyCompleted(panelId))||"[]"); }catch{ return []; } }
-  function saveCompleted(panelId, arr){ try{ localStorage.setItem(keyCompleted(panelId), JSON.stringify(arr)); }catch{} }
+  // --- Firestore版 read/save ---
+  window.readNames = async function(panelId){
+    try {
+      const snap = await panelDoc(panelId).get();
+      return snap.exists ? (snap.data().names || []) : [];
+    } catch(e){
+      console.error("readNames error:", e);
+      return [];
+    }
+  }
+  window.saveNames = function(panelId, arr){
+    panelDoc(panelId).set({ names: arr }, { merge: true })
+      .catch(e=>console.error("saveNames error:", e));
+  }
 
-  function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function parseMD(txt){ const t=(txt||"").trim(); const m=t.match(MD_RE); return m? {mm:m[1],dd:m[2]}:null; }
-  function isoToMD(iso){ if(!iso) return ""; const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/); return m? (m[2]+"/"+m[3]) : ""; }
-  function mdToISO(md, year){ return md? (year+"-"+md.mm+"-"+md.dd) : ""; }
+  window.readCompleted = async function(panelId){
+    try {
+      const snap = await panelDoc(panelId).get();
+      return snap.exists ? (snap.data().completed || []) : [];
+    } catch(e){
+      console.error("readCompleted error:", e);
+      return [];
+    }
+  }
+  window.saveCompleted = function(panelId, arr){
+    panelDoc(panelId).set({ completed: arr }, { merge: true })
+      .catch(e=>console.error("saveCompleted error:", e));
+  }
+
+  // --- 既存の補助関数たちはそのまま ---
+  window.esc = function(s){ return String(s).replace(/[&<>"']/g,
+    c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+  ); }
+
+  function parseMD(txt){
+    const t=(txt||"").trim();
+    const m=t.match(MD_RE);
+    return m? {mm:m[1],dd:m[2]}:null;
+  }
+
+  window.isoToMD = function(iso){
+    if(!iso) return "";
+    const m=String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m? (m[2]+"/"+m[3]) : "";
+  }
+
+  function mdToISO(md, year){
+    return md? (year+"-"+md.mm+"-"+md.dd) : "";
+  }
+
   function inferYear(){ return new Date().getFullYear(); }
 
-function normalizeData(raw){
-  const toObj = (v)=>{
-    if(!v) return { md:"", ymd:"", checked:false };
-    if(typeof v === "string"){
-      // "MM/DD"
-      const md = parseMD(v);
-      if(md) return { md: md.mm+"/"+md.dd, ymd:"", checked:false };
-      // "YYYY-MM-DD"
-      const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-      if(m) return { md: m[2]+"/"+m[3], ymd: v, checked:false };
-      return { md: String(v), ymd:"", checked:false };
-    }
-    return {
-      md: v.md ? String(v.md) : "",
-      ymd: v.ymd ? String(v.ymd) : "",
-      checked: !!v.checked
+  window.normalizeData = function(raw){
+    const toObj = (v)=>{
+      if(!v) return { md:"", ymd:"", checked:false };
+      if(typeof v === "string"){
+        // "MM/DD"
+        const md = parseMD(v);
+        if(md) return { md: md.mm+"/"+md.dd, ymd:"", checked:false };
+        // "YYYY-MM-DD"
+        const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if(m) return { md: m[2]+"/"+m[3], ymd: v, checked:false };
+        return { md: String(v), ymd:"", checked:false };
+      }
+      return {
+        md: v.md ? String(v.md) : "",
+        ymd: v.ymd ? String(v.ymd) : "",
+        checked: !!v.checked
+      };
     };
-  };
 
-  return (raw||[]).map(item=>{
-    const name  = item?.name || (typeof item==='string' ? item : "");
-    const buy   = Number(item?.buy||0);
-    const group = item?.group ? String(item.group) : "";
-    const staff = item?.staff ? String(item.staff) : "";
-    let dates = item?.dates || [];
-    if(!Array.isArray(dates)) dates = [];
-    dates = dates.slice(0,10).map(toObj);
-    while(dates.length < 10) dates.push({ md:"", ymd:"", checked:false });
-    return { name, staff, buy, group, dates };
-  });
-}
+    return (raw||[]).map(item=>{
+      const name  = item?.name || (typeof item==='string' ? item : "");
+      const buy   = Number(item?.buy||0);
+      const group = item?.group ? String(item.group) : "";
+      const staff = item?.staff ? String(item.staff) : "";
+      let dates = item?.dates || [];
+      if(!Array.isArray(dates)) dates = [];
+      dates = dates.slice(0,10).map(toObj);
+      while(dates.length < 10) dates.push({ md:"", ymd:"", checked:false });
+      return { name, staff, buy, group, dates };
+    });
+  }
+
+})(); // IIFE終わり
 
   function isAdviser(panelId){ return String(panelId||'').indexOf('tab4')===0; }
 
@@ -463,31 +537,30 @@ function normalizeData(raw){
     }, 0);
   }
 
-  function updateMainUnpaid(mainId){
-    const badge = document.querySelector('.main-unpaid[data-main="'+mainId+'"]');
-    if(!badge) return;
-    const d1 = normalizeData(readNames(mainId+'-sub1'));
-    const d2 = normalizeData(readNames(mainId+'-sub2'));
-    const sum = sumUnpaidForData(mainId+'-sub1', d1) + sumUnpaidForData(mainId+'-sub2', d2);
-    badge.textContent = '未払合計: ¥'+fmtJPY.format(sum);
-    updateOverallUnpaid();
-  }
+async function updateMainUnpaid(mainId){
+  const badge = document.querySelector('.main-unpaid[data-main="'+mainId+'"]');
+  if(!badge) return;
+  const d1 = normalizeData(await readNames(mainId+'-sub1'));
+  const d2 = normalizeData(await readNames(mainId+'-sub2'));
+  const sum = sumUnpaidForData(mainId+'-sub1', d1) + sumUnpaidForData(mainId+'-sub2', d2);
+  badge.textContent = '未払合計: ¥'+fmtJPY.format(sum);
+  await updateOverallUnpaid();
+}
 
-function updateOverallUnpaid(){
+async function updateOverallUnpaid(){
   const grandEl = document.getElementById('overall-unpaid');
   const advEl   = document.getElementById('adviser-unpaid');
   if(!grandEl) return;
 
-  let grand = 0; // 在籍顧問を除いた総未払
-  let adviserSum = 0; // 在籍顧問の未払合計
+  let grand = 0;
+  let adviserSum = 0;
 
   for(const mid of MAIN_TABS){
-    const d1 = normalizeData(readNames(mid+'-sub1'));
-    const d2 = normalizeData(readNames(mid+'-sub2'));
+    const d1 = normalizeData(await readNames(mid+'-sub1'));
+    const d2 = normalizeData(await readNames(mid+'-sub2'));
+
     if(mid === 'tab4'){
-      // 在籍顧問タブ（sub1のみ）
       adviserSum += sumUnpaidForData(mid+'-sub1', d1);
-      // ※ 総未払(grand)には加算しない
     } else {
       grand += sumUnpaidForData(mid+'-sub1', d1) + sumUnpaidForData(mid+'-sub2', d2);
     }
@@ -500,10 +573,10 @@ function updateOverallUnpaid(){
 }
 
   // テーブル描画
-function renderTable(panelId){
+async function renderTable(panelId){
   const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
   const tbody = table && table.querySelector('tbody'); if(!tbody) return;
-  const data = normalizeData(readNames(panelId));
+  const data = normalizeData(await readNames(panelId));
   const isSB = panelId.endsWith('sub2');
   const isAdv = isAdviser(panelId);
 
@@ -549,7 +622,7 @@ function renderTable(panelId){
         // 元データ上のインデックス（削除ボタン用）
         const originalIndex = data.indexOf(row);
 
-const dateCells = (row.dates||[]).map(function(cell,k){
+ const dateCells = (row.dates||[]).map(function(cell,k){
   // 在籍顧問は「DD」表示に統一（既存データがMM/DDやYYYY-MM-DDでもDDへ縮約）
   let v = '';
   if(cell){
@@ -681,12 +754,12 @@ document.querySelectorAll('form.name-form').forEach(enableEnterTabbing);
   });
 
   // 削除（完了テーブル）※確認ダイアログ付き
-document.addEventListener('click', (e)=>{
+document.addEventListener('click', async (e)=>{   // ★ async を追加
   const btn = e.target.closest('button[data-action="cdel"]');
   if(!btn) return;
   const panelId = btn.dataset.panel; 
   const idx = Number(btn.dataset.index);
-  const data = normalizeData(readCompleted(panelId));
+  const data = normalizeData(await readCompleted(panelId)); // ← await 使える
   const row = data[idx];
   const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
   if(!window.confirm(`${name} を完了一覧から削除します。よろしいですか？`)) return;
@@ -857,46 +930,46 @@ document.addEventListener('change', (e)=>{
   }
 
   // 完了テーブル描画（在籍は使わない）
-function renderCompletedTable(panelId){
+async function renderCompletedTable(panelId){
   if(isAdviser(panelId)) return;
   ensureCompletedContainer(panelId);
   const tbl = document.querySelector('table.completed-table[data-panel="'+panelId+'"]');
   if(!tbl) return;
   const tbody = tbl.querySelector('tbody');
-  const data = normalizeData(readCompleted(panelId));
+  const data = normalizeData(await readCompleted(panelId));
   const isSB = panelId.endsWith('sub2');
 
-  tbody.innerHTML = data.map((row,i)=>{
-    const buyCell = isSB ? '<td class="buy-cell">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
-    const staffCell = '<td>'+esc(row.staff||'')+'</td>';  // ★ 担当セル追加
-    const dateCells = (row.dates||[]).map((cell)=>{
-      const v = cell && (cell.md || isoToMD(cell.ymd||"")) || "";
-      const tdCls = cell && cell.checked ? 'date-td is-checked' : 'date-td';
-      return '<td class="'+tdCls+'"><div class="date-wrap">\
-        <input type="checkbox" class="day-check" disabled '+(cell&&cell.checked?'checked':'')+'>\
-        <input type="text" class="md-input" value="'+esc(v)+'" disabled>\
-      </div></td>';
-    }).join("");
-    const total = calcAmount(panelId, row.dates||[]);
-    const unpaid = calcUnpaid(panelId, row.dates||[], total);
-    const remainCell = isSB ? '<td class="remain-cell">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
-    return '<tr>\
-      <td>'+(i+1)+'</td>\
-      <td>'+esc(row.name)+'</td>\
-      <td>'+esc(row.staff||'')+'</td>\
-      '+staffCell+buyCell+dateCells+'\
-      <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>'+remainCell+'\
-      <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
-      <td><button class="btn" data-action="restore" data-index="'+i+'" data-panel="'+panelId+'">戻す</button>\
-          <button class="btn" data-action="cdel" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
-    </tr>';
+tbody.innerHTML = data.map((row,i)=>{
+  const buyCell = isSB ? '<td class="buy-cell">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
+  const dateCells = (row.dates||[]).map((cell)=>{
+    const v = cell && (cell.md || isoToMD(cell.ymd||"")) || "";
+    const tdCls = cell && cell.checked ? 'date-td is-checked' : 'date-td';
+    return '<td class="'+tdCls+'"><div class="date-wrap">\
+      <input type="checkbox" class="day-check" disabled '+(cell&&cell.checked?'checked':'')+'>\
+      <input type="text" class="md-input" value="'+esc(v)+'" disabled>\
+    </div></td>';
   }).join("");
+  const total = calcAmount(panelId, row.dates||[]);
+  const unpaid = calcUnpaid(panelId, row.dates||[], total);
+  const remainCell = isSB ? '<td class="remain-cell">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
+
+  return '<tr>\
+    <td>'+(i+1)+'</td>\
+    <td>'+esc(row.name)+'</td>\
+    <td>'+esc(row.staff||'')+'</td>\
+    '+buyCell+dateCells+'\
+    <td class="amount-cell">¥'+fmtJPY.format(total)+'</td>'+remainCell+'\
+    <td class="unpaid-cell">¥'+fmtJPY.format(unpaid)+'</td>\
+    <td><button class="btn" data-action="restore" data-index="'+i+'" data-panel="'+panelId+'">戻す</button>\
+        <button class="btn" data-action="cdel" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
+  </tr>';
+}).join("");
 }
 
   // 初期トータル
   MAIN_TABS.forEach(updateMainUnpaid);
   updateOverallUnpaid();
-})();
+
 </script>
 </body>
 </html>
