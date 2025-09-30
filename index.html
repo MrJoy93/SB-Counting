@@ -138,6 +138,18 @@ nav.tabs {
   overflow-y: auto;
 }
 
+/* 全体合計バーを横並びに */
+.overall-bar {
+  display: flex;
+  flex-wrap: wrap;        /* 横幅が足りない時は折り返し */
+  gap: 8px;               /* バッジ同士の間隔 */
+  margin: 12px 0;         /* 上下の余白は好みに合わせて */
+}
+
+.overall-bar .overall-unpaid {
+  flex: 0 0 auto;         /* 必要分だけ幅を取る */
+}
+
 /* === Mobile Card Layout === */
 @media (max-width: 720px) {
   /* テーブル→カード化の基本 */
@@ -277,12 +289,110 @@ nav.tabs {
   .filter-row { display:none; } /* PCでは非表示 */
 }
 
+@media (max-width: 480px) {
+  header {
+    justify-content: space-between; /* 横幅に応じて整列 */
+  }
+  .overall-unpaid {
+    flex: 1 1 45%; /* 2列レイアウト */
+  }
+}
+
+@media (max-width: 600px) {
+  .overall-bar {
+    flex-direction: column;  /* 縦並び */
+    align-items: flex-start; /* 左寄せ */
+  }
+  .overall-bar .overall-unpaid {
+    width: 100%;             /* フル幅 */
+  }
+}
+
+/* === 全体合計バー === */
+/* PC：横並びで右寄せ */
+.overall-bar {
+  display: flex;
+  justify-content: flex-end;   /* ← 右寄せ */
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+/* overallバー内では、グローバルの margin-left:auto を無効化 */
+.overall-bar .overall-unpaid {
+  margin-left: 0;              /* ← これが効かないと右に寄らない */
+  flex: 0 0 auto;
+}
+
+/* スマホ：同じサイズの枠で揃える（2列グリッド） */
+@media (max-width: 600px) {
+  .overall-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));  /* 2列で均等幅 */
+    gap: 8px;
+    justify-content: initial;
+  }
+  .overall-bar .overall-unpaid {
+    width: 100%;               /* カード幅を揃える */
+    text-align: center;        /* 文言は中央 */
+  }
+}
+/* さらに狭い端末は1列に */
+@media (max-width: 360px) {
+  .overall-bar { grid-template-columns: 1fr; }
+}
+
+/* === overallバー（スマホ時）を同サイズに揃える強制上書き === */
+@media (max-width: 600px) {
+  .overall-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2列均等 */
+    gap: 8px;
+  }
+  .overall-bar .overall-unpaid {
+    width: 100% !important;     /* ← max-content を打ち消す */
+    min-height: 40px;           /* 高さも揃えたい場合 */
+    display: flex;
+    align-items: center;
+    justify-content: center;    /* 文字を中央に */
+    white-space: nowrap;
+  }
+}
+/* さらに狭い端末は1列 */
+@media (max-width: 360px) {
+  .overall-bar { grid-template-columns: 1fr; }
+}
+
+/* === ヘッダー用のID指定はヘッダー内だけに限定（衝突回避） === */
+@media (max-width: 720px) {
+  header #overall-unpaid,
+  header #adviser-unpaid {
+    width: max-content;   /* ← ヘッダー内だけで有効にする */
+    margin-left: auto;
+  }
+}
+
+/* 在籍顧問リセットボタン（右下固定） */
+#adviser-clear-dates {
+  display: none;              /* デフォルト非表示 */
+  margin: 16px auto 0;        /* 下に余白をつけて中央寄せ */
+  background: #d32f2f;
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+#adviser-clear-dates.show {
+  display: block;             /* JSで末尾に来たら表示 */
+}
 
 </style>
 </head>
 <body>
 <header>
-  <h1>SB-Counting Ver.2.3</h1>
+  <h1>SB-Counting Ver.2.4</h1>
   <div class="tabs-bar">
     <nav class="tabs" aria-label="Main Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab1">タチバナ</button>
@@ -290,13 +400,16 @@ nav.tabs {
       <button class="tab-btn" aria-selected="false" data-tab="tab3">その他</button>
       <button class="tab-btn" aria-selected="false" data-tab="tab4">在籍顧問</button>
     </nav>
-<div class="overall-unpaid" id="overall-unpaid" aria-live="polite">足代未払合計: ¥0</div>
-<div class="overall-unpaid" id="sb-unpaid" aria-live="polite">SB未払合計: ¥0</div>
-<div class="overall-unpaid" id="sb-progress" aria-live="polite">SB作成中: ¥0</div>
-<div class="overall-unpaid" id="overall-total"   aria-live="polite">総合計: ¥0</div>
-<div class="overall-unpaid" id="adviser-unpaid" aria-live="polite">顧問未払合計: ¥0</div>
   </div>
 </header>
+
+  <div class="overall-bar">
+    <div class="overall-unpaid" id="overall-unpaid">足代未払合計: ¥0</div>
+    <div class="overall-unpaid" id="sb-unpaid">SB未払合計: ¥0</div>
+    <div class="overall-unpaid" id="sb-progress">SB作成中: ¥0</div>
+    <div class="overall-unpaid" id="overall-total">総合計: ¥0</div>
+    <div class="overall-unpaid" id="adviser-unpaid">顧問未払合計: ¥0</div>
+  </div>
 
 <main>
   <!-- ===== タチバナ ===== -->
@@ -583,6 +696,11 @@ nav.tabs {
           </thead><tbody></tbody>
         </table>
       </div>
+      <div id="adv-bottom-sentinel" aria-hidden="true"></div>
+      <button id="adviser-clear-dates" type="button" class="btn" style="display:none">
+       在籍顧問：日付を全クリア
+      </button>
+
     </section>
   </section>
 </main>
@@ -632,29 +750,39 @@ const TENANT_ID = "prod";
 // 次にフォーカスさせたいセルの予約（renderTable完了後に拾う）
 window.__pendingFocus__ = null; // { panelId, r, k }
 
-  function focusCell(panelId, r, k){
-  const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+r+'"][data-di="'+k+'"]';
-  const el = document.querySelector(sel);
-  if(el){ el.focus(); if(el.select) el.select(); }
-  }
-
-  // Enterで次要素に移動（最後ならsubmit）
+// Enterで次要素に移動（最後ならsubmit）
 function enableEnterTabbing(root){
   const sel = 'input, select, textarea, button';
   root.addEventListener('keydown', (e)=>{
     if(e.key !== 'Enter') return;
 
-    // ★ md-input は確定(change)→再描画→予約フォーカスに任せる
-    if (e.target && e.target.classList && e.target.classList.contains('md-input')) {
+    // === md-input（日付セル）は特殊処理 ===
+    if (e.target && e.target.classList.contains('md-input')) {
       e.preventDefault();
       e.stopPropagation();
+
+      const panelId = e.target.dataset.panel;
+      const r = Number(e.target.dataset.row);
+      const k = Number(e.target.dataset.di);
+
+        // 10スロット固定。次は「同じ行の次→行送り」
+        const totalSlots = 10;
+        const nextK = (k + 1) % totalSlots;
+        const nextR = (nextK === 0) ? (r + 1) : r;
+
+       // ★ Enterの意図を最優先：無条件で上書き
+       __pendingFocus__ = { panelId, r: nextR, k: nextK };
+
+      // それから change を発火 → 保存・再描画 → renderTable末尾で予約が拾われる
       e.target.dispatchEvent(new Event('change', { bubbles: true }));
       return;
     }
 
-    if(e.target && e.target.tagName === 'TEXTAREA') return; // textareaは改行を優先
-    e.preventDefault();
+    // === textareaは改行を優先 ===
+    if(e.target && e.target.tagName === 'TEXTAREA') return;
 
+    // === それ以外の入力要素は単純に次へ ===
+    e.preventDefault();
     const focusables = Array.from(root.querySelectorAll(sel))
       .filter(el => !el.disabled && el.type !== 'hidden' && el.offsetParent !== null);
     const i = focusables.indexOf(e.target);
@@ -667,11 +795,12 @@ function enableEnterTabbing(root){
   });
 }
 
+
 (function(){
   window.MAIN_TABS = ["tab1","tab2","tab3","tab4"];
   window.fmtJPY = new Intl.NumberFormat('ja-JP');
   const MD_RE = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])$/;
-  const DD_RE = /^(0[1-9]|[12][0-9]|3[01])$/; // 在籍顧問用：日だけ
+  const DD_RE = /^(0?[1-9]|[12][0-9]|3[01])$/; // 在籍顧問用：日だけ
   // 3～4桁の「スラなし」(927, 0927, 1127, 0105 など)
   const MD_NUM_RE = /^\d{3,4}$/;
 
@@ -814,19 +943,23 @@ document.addEventListener('change', async (e)=>{
     saveNames(panelId, data);
     renderTable(panelId);
     // ★ 再描画後に次セルへ
-    __pendingFocus__ = { panelId, r: nextR, k: nextK };
+if (!window.__pendingFocus__) {
+  __pendingFocus__ = { panelId, r: nextR, k: nextK }; // ← 予約が無いときだけ補完
+}
     return;
   }
 
-  if(isAdv){
-    // 在籍顧問：DDのみ
-    if(!DD_RE.test(raw)){ el.classList.add('invalid'); return; }
-    el.classList.remove('invalid');
-    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
-    data[r].dates[k] = { md: raw, ymd: "", checked: wasChecked };
-    saveNames(panelId, data);
-    renderTable(panelId);
+if(isAdv){
+  if(!DD_RE.test(raw)){ el.classList.add('invalid'); return; }
+  el.classList.remove('invalid');
+  const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+  const day = String(Number(raw)).padStart(2,'0');  // ← ここ追加
+  data[r].dates[k] = { md: day, ymd: "", checked: wasChecked };
+  saveNames(panelId, data);
+  renderTable(panelId);
+  if (!window.__pendingFocus__) {
     __pendingFocus__ = { panelId, r: nextR, k: nextK };
+  }
   }else{
     // 通常：MM/DD → YYYY-MM-DD
     const md = parseMD(raw);
@@ -837,7 +970,9 @@ document.addEventListener('change', async (e)=>{
     data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
     saveNames(panelId, data);
     renderTable(panelId);
-    __pendingFocus__ = { panelId, r: nextR, k: nextK };
+if (!window.__pendingFocus__) {
+  __pendingFocus__ = { panelId, r: nextR, k: nextK }; // ← 予約が無いときだけ補完
+}
   }
 });
 
@@ -1031,10 +1166,15 @@ async function updateOverallUnpaid(){
   // テーブル描画
 async function renderTable(panelId){
   const table = document.querySelector('table.name-table[data-panel="'+panelId+'"]');
-  const tbody = table && table.querySelector('tbody'); if(!tbody) return;
+  const tbody = table && table.querySelector('tbody');
+  if(!tbody) return;
+
   const data = normalizeData(await readNames(panelId));
-  const isSB = panelId.endsWith('sub2');
+  const isSB  = panelId.endsWith('sub2');
   const isAdv = isAdviser(panelId);
+
+  // ★ 全行に元配列インデックスを埋め込む
+  data.forEach((row,i)=> row._idx = i);
 
   function groupLabel(id){
     return id==='tab1' ? 'タチバナ'
@@ -1043,138 +1183,159 @@ async function renderTable(panelId){
          : '未設定';
   }
 
-  // === 在籍顧問：グループごとにまとめ、氏名は降順、グループ小計（金額）を表示 ===
+  // === 在籍顧問タブ ===
   if(isAdv){
-    // #, 氏名, 担当, D1..D10, 合計, 未払, 操作 = 16
     const COLS = 16;
+    const buckets = { tab1:[], tab2:[], tab3:[], _other:[] };
 
     // バケット化
-    const buckets = { tab1:[], tab2:[], tab3:[], _other:[] };
-    data.forEach(function(row){ 
-      const key = (row.group==='tab1' || row.group==='tab2' || row.group==='tab3') ? row.group : '_other';
+    data.forEach(row=>{
+      const key = (row.group==='tab1'||row.group==='tab2'||row.group==='tab3') ? row.group : '_other';
       buckets[key].push(row);
     });
 
-    // 氏名降順（ja ロケール）
-    Object.keys(buckets).forEach(function(k){
-      buckets[k].sort(function(a,b){
-      return String(b.name||'').localeCompare(String(a.name||''), 'ja') * -1;
-      });
+    // 氏名降順
+    Object.keys(buckets).forEach(k=>{
+      buckets[k].sort((a,b)=> String(b.name||'').localeCompare(String(a.name||''),'ja'));
     });
 
     const order = ['tab1','tab2','tab3','_other'];
     const htmlParts = [];
 
-    order.forEach(function(g){
+    order.forEach(g=>{
       const rows = buckets[g]; if(!rows || rows.length===0) return;
       const label = g==='_other' ? '未設定' : groupLabel(g);
 
-      // グループ見出し行
+      // グループ見出し
       htmlParts.push('<tr class="group-row"><td colspan="'+COLS+'">グループ：'+esc(label)+'</td></tr>');
 
       let groupTotal = 0;
+      let rowNo = 1;
 
       rows.forEach(function(row){
-        // 元データ上のインデックス（削除ボタン用）
-        const originalIndex = data.indexOf(row);
+        const originalIndex = row._idx;
 
-const dateCells = (row.dates||[]).map(function(cell,k){
-  // 在籍顧問は「DD」表示
-  let v = '';
-  if(cell){
-    if(cell.md){
-      const m = String(cell.md).match(/^\d{2}\/(\d{2})$/);
-      v = m ? m[1] : String(cell.md).slice(-2);
-    }else if(cell.ymd){
-      v = String(cell.ymd).slice(-2);
-    }
-  }
-  return '<td class="date-td" data-label="D'+(k+1)+'">\
-    <div class="date-wrap">\
-      <input type="text" inputmode="numeric" placeholder="DD" class="md-input" \
+        const dateCells = (row.dates||[]).map(function(cell,k){
+          let v = '';
+          if(cell){
+            if(cell.md){
+              const m = String(cell.md).match(/^\d{2}\/(\d{2})$/);
+              v = m ? m[1] : String(cell.md).slice(-2);
+            }else if(cell.ymd){
+              v = String(cell.ymd).slice(-2);
+            }
+          }
+          return '<td class="date-td" data-label="D'+(k+1)+'">\
+            <div class="date-wrap">\
+              <input type="text" inputmode="numeric" placeholder="DD" class="md-input" \
 data-panel="'+panelId+'" data-row="'+originalIndex+'" data-di="'+k+'" \
 value="'+esc(v)+'" maxlength="2" \
-pattern="(0[1-9]|[12][0-9]|3[01])">\
-    </div></td>';
-}).join('');
+pattern="(0?[1-9]|[12][0-9]|3[01])">\
+            </div></td>';
+        }).join('');
 
-const total  = calcAmount(panelId, row.dates);
-const unpaid = calcUnpaid(panelId, row.dates, total);
-groupTotal  += Number(total)||0;
+        const total  = calcAmount(panelId, row.dates);
+        const unpaid = calcUnpaid(panelId, row.dates, total);
+        groupTotal  += Number(total)||0;
 
-htmlParts.push('<tr>\
-  <td data-label="#">'+(htmlParts.length)+'</td>\
-  <td data-label="氏名">'+esc(row.name)+'</td>\
-  <td data-label="担当">'+esc(row.staff||'')+'</td>\
-  '+dateCells+'\
-  <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
-  <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
-  <td data-label="操作"><button class="btn" data-action="del" data-index="'+originalIndex+'" data-panel="'+panelId+'">削除</button></td>\
-</tr>');
+        htmlParts.push('<tr>\
+          <td data-label="#">'+(rowNo++)+'</td>\
+          <td data-label="氏名">'+esc(row.name)+'</td>\
+          <td data-label="担当">'+esc(row.staff||'')+'</td>\
+          '+dateCells+'\
+          <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
+          <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
+          <td data-label="操作">\
+            <button class="btn" data-action="clear-dates" data-index="'+originalIndex+'" data-panel="'+panelId+'">日付クリア</button>\
+            <button class="btn" data-action="del" data-index="'+originalIndex+'" data-panel="'+panelId+'">削除</button>\
+          </td>\
+        </tr>');
       });
 
-      // グループ小計行
+      // グループ小計
       htmlParts.push('<tr class="group-subtotal"><td colspan="'+COLS+'">グループ合計金額：¥'+fmtJPY.format(groupTotal)+'</td></tr>');
     });
 
     tbody.innerHTML = htmlParts.join('');
     updateMainUnpaid(panelId.split('-')[0]);
-    return;
+
+    // ★ 追加：在籍顧問タブでも、再描画後に予約フォーカスを反映（i と r,k の両対応）
+    if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
+      const pf = __pendingFocus__;
+      requestAnimationFrame(() => {
+        if (typeof pf.i === 'number') {
+          const list = document.querySelectorAll('input.md-input[data-panel="'+panelId+'"]');
+          const el = list[pf.i];
+          if (el) { el.focus(); if(el.select) el.select(); }
+        } else if (pf.r != null && pf.k != null) {
+          const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+pf.r+'"][data-di="'+pf.k+'"]';
+          const el  = document.querySelector(sel);
+          if (el) { el.focus(); if(el.select) el.select(); }
+        }
+        __pendingFocus__ = null;
+      });
+    }
+
+    // 最後にボタン制御
+    toggleAdviserClearButton(panelId);
+    return; // ← 早期returnでも、直前でフォーカス反映済み
   }
 
-// === 通常タブ（タチバナ／ＯＺ／その他）は data-label を付与して描画 ===
-tbody.innerHTML = data.map(function(row,i){
-  const makeDateCells = (row.dates||[]).map(function(cell,k){
-    const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
-    const checked = cell && cell.checked ? 'checked' : '';
-    const tdCls   = cell && cell.checked ? 'date-td is-checked' : 'date-td';
-    const label   = 'D'+(k+1);
-    return '<td class="'+tdCls+'" data-label="'+label+'"><label class="date-wrap">\
-      <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
-      <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
+  // === 通常タブ ===
+  tbody.innerHTML = data.map(function(row,i){
+    const makeDateCells = (row.dates||[]).map(function(cell,k){
+      const v = cell && (cell.md || isoToMD(cell.ymd||'')) || '';
+      const checked = cell && cell.checked ? 'checked' : '';
+      const tdCls   = cell && cell.checked ? 'date-td is-checked' : 'date-td';
+      const label   = 'D'+(k+1);
+      return '<td class="'+tdCls+'" data-label="'+label+'"><label class="date-wrap">\
+        <input type="checkbox" class="day-check" data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" '+checked+'>\
+        <input type="text" inputmode="numeric" placeholder="MM/DD" class="md-input" \
 data-panel="'+panelId+'" data-row="'+i+'" data-di="'+k+'" value="'+esc(v)+'" maxlength="5" \
 pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
-    </label></td>';
+      </label></td>';
+    }).join('');
+
+    const total  = calcAmount(panelId, row.dates);
+    const unpaid = calcUnpaid(panelId, row.dates, total);
+
+    const buyCell    = (!isAdv && isSB) ? '<td class="buy-cell" data-label="買取金額">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
+    const remainCell = (!isAdv && isSB) ? '<td class="remain-cell" data-label="残金">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
+
+    return '<tr>\
+      <td data-label="#">'+(i+1)+'</td>\
+      <td data-label="氏名">'+esc(row.name)+'</td>\
+      <td data-label="担当">'+esc(row.staff||'')+'</td>\
+      '+buyCell+ makeDateCells +'\
+      <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
+      '+remainCell+'\
+      <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
+      <td data-label="操作"><button class="btn" data-action="del" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
+    </tr>';
   }).join('');
-
-  const total  = calcAmount(panelId, row.dates);
-  const unpaid = calcUnpaid(panelId, row.dates, total);
-
-  const buyCell    = (!isAdv && isSB) ? '<td class="buy-cell" data-label="買取金額">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
-  const remainCell = (!isAdv && isSB) ? '<td class="remain-cell" data-label="残金">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
-
-  return '<tr>\
-    <td data-label="#">'+(i+1)+'</td>\
-    <td data-label="氏名">'+esc(row.name)+'</td>\
-    <td data-label="担当">'+esc(row.staff||'')+'</td>\
-    '+buyCell+ makeDateCells +'\
-    <td class="amount-cell" data-label="合計金額">¥'+fmtJPY.format(total)+'</td>\
-    '+remainCell+'\
-    <td class="unpaid-cell" data-label="未払金額">¥'+fmtJPY.format(unpaid)+'</td>\
-    <td data-label="操作"><button class="btn" data-action="del" data-index="'+i+'" data-panel="'+panelId+'">削除</button></td>\
-  </tr>';
-}).join('');
 
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
 
+  updateFilterOptions(panelId, data);
+  applyNameFilter(panelId);
 
-// フィルタ用セレクトを更新
-updateFilterOptions(panelId, data);
-
-applyNameFilter(panelId);
-
-  // === 再描画完了後にフォーカス予約を消化 ===
-if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
-  const { r, k } = __pendingFocus__;
-  // レイアウト確定後に確実にフォーカス（filterやグルーピングの影響を回避）
-  requestAnimationFrame(() => {
-    focusCell(panelId, r, k);
-    __pendingFocus__ = null;
-  });
+  // （通常タブは元々ここで予約フォーカスを拾っている）
+  if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
+    const pf = __pendingFocus__;
+    requestAnimationFrame(() => {
+      if (typeof pf.i === 'number') {
+        focusCell(panelId, pf.i);
+      } else {
+        const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+pf.r+'"][data-di="'+pf.k+'"]';
+        const el  = document.querySelector(sel);
+        if (el) el.focus();
+      }
+      __pendingFocus__ = null;
+    });
+  }
 }
 
-}
 
 function updateFilterOptions(panelId, data){
   const sel = document.querySelector('.filter-select[data-panel="'+panelId+'"]');
@@ -1309,7 +1470,7 @@ document.addEventListener('click', async (e)=>{
 });
 
 document.querySelectorAll('form.name-form').forEach(initForm);
-document.querySelectorAll('section.panel').forEach(enableEnterTabbing);
+enableEnterTabbing(document.querySelector('main'));
 
 
   // 削除（アクティブ）※確認ダイアログ付き
@@ -1511,6 +1672,72 @@ MAIN_TABS.forEach(tab => {
   subscribePanel(tab+'-sub1');
   if (tab !== 'tab4') subscribePanel(tab+'-sub2');
 });
+
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="clear-dates"]');
+  if(!btn) return;
+  const panelId = btn.dataset.panel;   // "tab4-sub1"
+  if(!panelId || !panelId.startsWith('tab4')) return;
+
+  const idx = Number(btn.dataset.index);
+  const data = normalizeData(await readNames(panelId));
+  const row  = data[idx];
+  if(!row) return;
+
+  const label = row.name ? `「${row.name}」` : `No.${idx+1}`;
+  if(!window.confirm(`${label} の登録済み“日付だけ”をクリアします。よろしいですか？`)) return;
+
+  row.dates = (row.dates||[]).map(()=>({ md:"", ymd:"", checked:false }));
+  saveNames(panelId, data);
+  renderTable(panelId);
+  updateMainUnpaid('tab4');
+});
+
+// 在籍顧問 全クリアボタンの表示制御＆イベントバインド
+function toggleAdviserClearButton(panelId){
+  const btn = document.getElementById('adviser-clear-dates');
+  if(!btn) return;
+
+  if(panelId === 'tab4-sub1'){
+    btn.style.display = 'block';
+
+    if(!btn.dataset.bound){
+      btn.addEventListener('click', async ()=>{
+        const data = normalizeData(await readNames('tab4-sub1'));
+        if(!data.length) return;
+        if(!window.confirm('在籍顧問の全員の日付を削除します。氏名・担当は残ります。よろしいですか？')) return;
+
+        data.forEach(row=>{
+          row.dates = (row.dates||[]).map(()=>({ md:"", ymd:"", checked:false }));
+        });
+
+        await saveNames('tab4-sub1', data);
+        renderTable('tab4-sub1');
+        updateMainUnpaid('tab4');
+      });
+      btn.dataset.bound = "1"; // ← 二重登録防止
+    }
+  } else {
+    btn.style.display = 'none';
+  }
+}
+
+// 在籍顧問：スクロール末尾に来たら右下にボタンを出す
+(function setupAdviserClearButton(){
+  const btn = document.getElementById('adviser-clear-dates');
+  const sentinel = document.getElementById('adv-bottom-sentinel');
+  if(!btn || !sentinel) return;
+
+  // 末尾に入ったら表示、外れたら非表示
+  const io = new IntersectionObserver((entries)=>{
+    const onBottom = entries.some(en => en.isIntersecting);
+    btn.style.display = onBottom ? 'block' : 'none';
+  }, { root: null, threshold: 0.05 });
+  io.observe(sentinel);
+  
+})();
+
+
 
 </script>
 </body>
