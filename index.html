@@ -981,13 +981,17 @@ if (!window.__pendingFocus__) {
   function isAdviser(panelId){ return String(panelId||'').indexOf('tab4')===0; }
 
   // 合計金額
-  function calcAmount(panelId, dates){
+  function calcAmount(panelId, dates, buy){
     const filled = (dates||[]).filter(d=> d && d.md).length;
     if(isAdviser(panelId)){
-      // 在籍顧問：10日到達で一律 20,000
       return filled>=10 ? 20000 : 0;
     }
-    return panelId.endsWith('sub1') ? filled*5000 : panelId.endsWith('sub2') ? filled*20000 : 0;
+    if(panelId.endsWith('sub1')) return filled * 5000;
+    if(panelId.endsWith('sub2')){
+      const unit = (Number(buy) || 0) / 10; // 1日分
+      return unit * filled;
+    }
+    return 0;
   }
 
   // 未払金額
@@ -1010,7 +1014,7 @@ if (!window.__pendingFocus__) {
     const isSB = panelId.endsWith('sub2');
     const isAdv = isAdviser(panelId);
     return (data||[]).reduce((acc,row)=>{
-      const total  = calcAmount(panelId, row.dates||[]);
+      const total  = calcAmount(panelId, row.dates||[], row.buy);
       const unpaid = calcUnpaid(panelId, row.dates||[], total);
       if(!isAdv && isSB){
         // 通常SB：買取金額−合計＝0 の行のみ未払合計に入れる
@@ -1234,7 +1238,7 @@ pattern="(0?[1-9]|[12][0-9]|3[01])">\
             </div></td>';
         }).join('');
 
-        const total  = calcAmount(panelId, row.dates);
+        const total  = calcAmount(panelId, row.dates, row.buy);
         const unpaid = calcUnpaid(panelId, row.dates, total);
         groupTotal  += Number(total)||0;
 
@@ -1296,7 +1300,7 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
       </label></td>';
     }).join('');
 
-    const total  = calcAmount(panelId, row.dates);
+    const total  = calcAmount(panelId, row.dates, row.buy);
     const unpaid = calcUnpaid(panelId, row.dates, total);
 
     const buyCell    = (!isAdv && isSB) ? '<td class="buy-cell" data-label="買取金額">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
