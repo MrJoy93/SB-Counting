@@ -2,9 +2,17 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
+<!-- Safariにダークモード対応を宣言 -->
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>SB-Counting</title>
 <style>
+
+  html, body {
+  background-color: #121826 !important;
+  color: #eaf6ff; /* 既存の文字色と統一 */
+}
   :root{
     --brand:#00f5ff; --panel:rgba(30,38,60,.78); --text:#eaf6ff; --muted:#97e4f5;
     --checked-bg: rgba(0,245,255,.14); --checked-border: rgba(0,245,255,.55);
