@@ -1070,17 +1070,25 @@ if (!window.__pendingFocus__) {
   }
 
   // 未払金額
-  function calcUnpaid(panelId, dates, total){
-    if(isAdviser(panelId)){
-      // 在籍顧問：控除なし → 未払＝発生額
-      return Math.max(0, Number(total)||0);
-    }
-    const checkedCount = (dates||[]).filter(d=> !!d.checked).length;
-    let unpaid = 0;
-    if(panelId.endsWith('sub1')) unpaid = total - checkedCount*5000;
-    if(panelId.endsWith('sub2')) unpaid = total - checkedCount*20000;
-    return Math.max(0, unpaid);
+function calcUnpaid(panelId, dates, total, buy){
+  if(isAdviser(panelId)){
+    // 在籍顧問：控除なし → 未払＝発生額
+    return Math.max(0, Number(total)||0);
   }
+  const checkedCount = (dates||[]).filter(d=> !!d.checked).length;
+
+  let unpaid = 0;
+  if(panelId.endsWith('sub1')){
+    // 足代：1チェック=5,000円
+    unpaid = total - checkedCount * 5000;
+  }
+  if(panelId.endsWith('sub2')){
+    // SB：1日分= buy/10 を控除
+    const unit = (Number(buy)||0) / 10;
+    unpaid = total - checkedCount * unit;
+  }
+  return Math.max(0, unpaid);
+}
 
   function calcRemain(buy, total){ return Math.max(0, (Number(buy)||0) - total); }
 
@@ -1090,7 +1098,7 @@ if (!window.__pendingFocus__) {
     const isAdv = isAdviser(panelId);
     return (data||[]).reduce((acc,row)=>{
       const total  = calcAmount(panelId, row.dates||[], row.buy);
-      const unpaid = calcUnpaid(panelId, row.dates||[], total);
+      const unpaid = calcUnpaid(panelId, row.dates||[], total, row.buy);
       if(!isAdv && isSB){
         // 通常SB：買取金額−合計＝0 の行のみ未払合計に入れる
         const rawRemain = (Number(row.buy)||0) - total;
@@ -1121,8 +1129,8 @@ async function sumAllSbUnpaidFull(){
       const dates = row.dates || [];
       const filled = dates.filter(d => d && d.md).length; // 記入済みスロット数
       if (filled === 10) {
-        const total  = calcAmount(mid+'-sub2', dates);
-        const unpaid = calcUnpaid(mid+'-sub2', dates, total);
+        const total  = calcAmount(mid+'-sub2', dates, row.buy);
+        const unpaid = calcUnpaid(mid+'-sub2', dates, total, row.buy);
         sum += unpaid;
       }
     }
@@ -1161,8 +1169,8 @@ async function sumSbUnpaidFullOf(mainId){
     const dates = row.dates || [];
     const filled = dates.filter(d => d && d.md).length;
     if (filled === 10) {
-      const total  = calcAmount(mainId+'-sub2', dates);
-      const unpaid = calcUnpaid(mainId+'-sub2', dates, total);
+      const total  = calcAmount(mainId+'-sub2', dates, row.buy);
+      const unpaid = calcUnpaid(mainId+'-sub2', dates, total, row.buy);
       sum += unpaid;
     }
   }
@@ -1314,7 +1322,7 @@ async function renderTable(panelId){
         }).join('');
 
         const total  = calcAmount(panelId, row.dates, row.buy);
-        const unpaid = calcUnpaid(panelId, row.dates, total);
+        const unpaid = calcUnpaid(panelId, row.dates, total, row.buy);
         groupTotal  += Number(total)||0;
 
         htmlParts.push('<tr>\
@@ -1376,7 +1384,7 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
     }).join('');
 
     const total  = calcAmount(panelId, row.dates, row.buy);
-    const unpaid = calcUnpaid(panelId, row.dates, total);
+    const unpaid = calcUnpaid(panelId, row.dates, total, row.buy);
 
     const buyCell    = (!isAdv && isSB) ? '<td class="buy-cell" data-label="買取金額">¥'+fmtJPY.format(Number(row.buy)||0)+'</td>' : '';
     const remainCell = (!isAdv && isSB) ? '<td class="remain-cell" data-label="残金">¥'+fmtJPY.format(calcRemain(row.buy, total))+'</td>' : '';
@@ -1829,7 +1837,7 @@ function _hideSaving(){
 
 // === 各タブの氏名インデックス（足代 / SB）を更新 ===
 async function updateNameIndex(mainId){
-  if (mainId === 'tab4') return; // 顧問は足代だけなので今回スキップ
+  if (mainId === 'tab4') return; // 顧問は別関数
 
   const root = document.querySelector('.name-index[data-main="'+mainId+'"]');
   if(!root) return;
@@ -1845,7 +1853,6 @@ async function updateNameIndex(mainId){
   const namesSb   = [...new Set(dSb.map(r => (r.name||'').trim()).filter(Boolean))]
                       .sort((a,b)=> a.localeCompare(b, 'ja'));
 
-  // HTML生成
   const section = (title, arr) => `
     <div class="col">
       <h4>${title}</h4>
