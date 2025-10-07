@@ -13,6 +13,7 @@
   background-color: #121826 !important;
   color: #eaf6ff; /* 既存の文字色と統一 */
 }
+
   :root{
     --brand:#00f5ff; --panel:rgba(30,38,60,.78); --text:#eaf6ff; --muted:#97e4f5;
     --checked-bg: rgba(0,245,255,.14); --checked-border: rgba(0,245,255,.55);
@@ -396,6 +397,29 @@ nav.tabs {
   display: block;             /* JSで末尾に来たら表示 */
 }
 
+/* === Name Index (氏名インデックス) === */
+.name-index{
+  display:grid; grid-template-columns: 1fr 1fr; gap:10px;
+  margin:8px 0 12px; padding:8px;
+  background:rgba(0,245,255,.06);
+  border:1px solid rgba(0,245,255,.18);
+  border-radius:10px;
+}
+.name-index .col{background:#0f172a;border:1px solid rgba(0,245,255,.18);border-radius:10px;padding:8px}
+.name-index .col h4{margin:0 0 6px;font-size:13px;color:#9fdaf0;letter-spacing:.06em}
+.name-list{
+  display:flex; flex-wrap:wrap; gap:6px; align-items:flex-start;
+  max-height:120px; overflow:auto;
+}
+.name-pill{
+  padding:4px 8px; border:1px solid rgba(0,245,255,.35);
+  border-radius:999px; background:#1c2a4a; color:#eaf6ff; font-size:12px;
+  max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+@media (max-width:600px){
+  .name-index{grid-template-columns:1fr}
+}
+
 </style>
 </head>
 <body>
@@ -439,6 +463,10 @@ nav.tabs {
       <button class="tab-btn" aria-selected="true" data-tab="tab1-sub1">足代</button>
       <button class="tab-btn" aria-selected="false" data-tab="tab1-sub2">SB</button>
     </nav>
+
+      <!-- ★ 追加：氏名インデックス（足代 / SB） -->
+      <div class="name-index" data-main="tab1" aria-live="polite"></div>
+      <!-- ★ ここまで追加 -->
 
     <!-- 足代 -->
     <section id="tab1-sub1" class="panel active">
@@ -517,6 +545,11 @@ nav.tabs {
          <div class="main-unpaid" data-main="tab2" data-kind="progress" aria-live="polite">SB作成中: ¥0</div>
          <div class="main-unpaid" data-main="tab2" data-kind="total">総合計: ¥0</div>
     </div>
+
+      <!-- ★ 追加：氏名インデックス（足代 / SB） -->
+      <div class="name-index" data-main="tab2" aria-live="polite"></div>
+      <!-- ★ ここまで追加 -->
+
     <nav class="tabs" aria-label="ＯＺ Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab2-sub1">足代</button>
       <button class="tab-btn" aria-selected="false" data-tab="tab2-sub2">SB</button>
@@ -597,6 +630,11 @@ nav.tabs {
          <div class="main-unpaid" data-main="tab3" data-kind="progress" aria-live="polite">SB作成中: ¥0</div>
          <div class="main-unpaid" data-main="tab3" data-kind="total">総合計: ¥0</div>
     </div>
+
+      <!-- ★ 追加：氏名インデックス（足代 / SB） -->
+      <div class="name-index" data-main="tab3" aria-live="polite"></div>
+      <!-- ★ ここまで追加 -->
+
     <nav class="tabs" aria-label="その他 Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab3-sub1">足代</button>
       <button class="tab-btn" aria-selected="false" data-tab="tab3-sub2">SB</button>
@@ -674,6 +712,11 @@ nav.tabs {
       <h2>在籍顧問</h2>
       <div class="main-unpaid" data-main="tab4" aria-live="polite">未払合計: ¥0</div>
     </div>
+
+    <!-- ★ 追加：在籍顧問インデックス -->
+    <div class="name-index" data-main="tab4" aria-live="polite"></div>
+    <!-- ★ ここまで追加 -->
+
     <nav class="tabs" aria-label="在籍顧問 Sub Tabs">
       <button class="tab-btn" aria-selected="true" data-tab="tab4-sub1">足代</button>
     </nav>
@@ -834,10 +877,16 @@ function enableEnterTabbing(root){
       return [];
     }
   }
- window.saveNames = function(panelId, arr){
+window.saveNames = function(panelId, arr){
   _showSaving();
   panelDoc(panelId).set({ names: arr }, { merge: true })
-    .then(()=> _hideSaving())
+    .then(()=>{
+      _hideSaving();
+      // ★ 各タブの氏名インデックス更新
+      updateNameIndex(panelId.split('-')[0]);
+      // ★ 在籍顧問タブは別途グループインデックスも更新
+      if(panelId === 'tab4-sub1') updateAdviserIndex();
+    })
     .catch(e=>{
       console.error("saveNames error:", e);
       _hideSaving();
@@ -1258,9 +1307,9 @@ async function renderTable(panelId){
           return '<td class="date-td" data-label="D'+(k+1)+'">\
             <div class="date-wrap">\
               <input type="text" inputmode="numeric" placeholder="DD" class="md-input" \
-data-panel="'+panelId+'" data-row="'+originalIndex+'" data-di="'+k+'" \
-value="'+esc(v)+'" maxlength="2" \
-pattern="(0?[1-9]|[12][0-9]|3[01])">\
+              data-panel="'+panelId+'" data-row="'+originalIndex+'" data-di="'+k+'" \
+              value="'+esc(v)+'" maxlength="2" \
+              pattern="(0?[1-9]|[12][0-9]|3[01])">\
             </div></td>';
         }).join('');
 
@@ -1346,6 +1395,8 @@ pattern="(0[1-9]|1[0-2])\\/(0[1-9]|[12][0-9]|3[01])">\
 
   if(!isAdv){ ensureCompletedContainer(panelId); renderCompletedTable(panelId); }
   updateMainUnpaid(panelId.split('-')[0]);
+  updateNameIndex(panelId.split('-')[0]);
+  updateAdviserIndex();
 
   updateFilterOptions(panelId, data);
   applyNameFilter(panelId);
@@ -1776,6 +1827,64 @@ function _hideSaving(){
   if(el) el.style.display = 'none';
 }
 
+// === 各タブの氏名インデックス（足代 / SB）を更新 ===
+async function updateNameIndex(mainId){
+  if (mainId === 'tab4') return; // 顧問は足代だけなので今回スキップ
+
+  const root = document.querySelector('.name-index[data-main="'+mainId+'"]');
+  if(!root) return;
+
+  // sub1=足代 / sub2=SB
+  const [dFoot, dSb] = await Promise.all([
+    readNames(mainId + '-sub1').then(normalizeData),
+    readNames(mainId + '-sub2').then(normalizeData).catch(()=>[])
+  ]);
+
+  const namesFoot = [...new Set(dFoot.map(r => (r.name||'').trim()).filter(Boolean))]
+                      .sort((a,b)=> a.localeCompare(b, 'ja'));
+  const namesSb   = [...new Set(dSb.map(r => (r.name||'').trim()).filter(Boolean))]
+                      .sort((a,b)=> a.localeCompare(b, 'ja'));
+
+  // HTML生成
+  const section = (title, arr) => `
+    <div class="col">
+      <h4>${title}</h4>
+      <div class="name-list">
+        ${arr.length ? arr.map(n=>`<span class="name-pill" title="${esc(n)}">${esc(n)}</span>`).join('') : '<span class="name-pill" style="opacity:.6">（なし）</span>'}
+      </div>
+    </div>
+  `;
+
+  root.innerHTML = section('足代', namesFoot) + section('SB', namesSb);
+}
+
+// === 在籍顧問（tab4）のグループ別氏名インデックス ===
+async function updateAdviserIndex(){
+  const root = document.querySelector('.name-index[data-main="tab4"]');
+  if(!root) return;
+
+  const dAdv = normalizeData(await readNames('tab4-sub1'));
+  const buckets = { tab1: [], tab2: [], tab3: [], _other: [] };
+  dAdv.forEach(r=>{
+    const g = (r.group==='tab1'||r.group==='tab2'||r.group==='tab3') ? r.group : '_other';
+    if(r.name) buckets[g].push(r.name.trim());
+  });
+
+  const labelMap = { tab1:'タチバナ', tab2:'ＯＺ', tab3:'その他', _other:'未設定' };
+  let html = '';
+  for(const key of ['tab1','tab2','tab3','_other']){
+    const arr = [...new Set(buckets[key])].sort((a,b)=>a.localeCompare(b,'ja'));
+    html += `
+      <div class="col">
+        <h4>${labelMap[key]}</h4>
+        <div class="name-list">
+          ${arr.length ? arr.map(n=>`<span class="name-pill" title="${esc(n)}">${esc(n)}</span>`).join('') : '<span class="name-pill" style="opacity:.6">（なし）</span>'}
+        </div>
+      </div>
+    `;
+  }
+  root.innerHTML = html;
+}
 
 
 </script>
