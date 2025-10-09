@@ -1148,7 +1148,7 @@ async function sumAllSbInProgressTotal(){
       const dates = row.dates || [];
       const filled = dates.filter(d => d && d.md).length;
       if (filled < 10) {
-        sum += calcAmount(mid+'-sub2', dates);
+       sum += calcAmount(mid+'-sub2', dates, row.buy);
       }
     }
   }
@@ -1184,7 +1184,7 @@ async function sumSbInProgressTotalOf(mainId){
   for (const row of d2) {
     const dates = row.dates || [];
     const filled = dates.filter(d => d && d.md).length;
-    if (filled < 10) sum += calcAmount(mainId+'-sub2', dates);
+    if (filled < 10) sum += calcAmount(mainId+'-sub2', dates, row.buy);
   }
   return sum;
 }
