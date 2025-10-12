@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v2.5</title>
+<title>SB-Counting v3.0</title>
 <style>
 
   html, body {
@@ -418,6 +418,35 @@ nav.tabs {
 }
 @media (max-width:600px){
   .name-index{grid-template-columns:1fr}
+}
+
+.panel > nav.tabs {
+  position: sticky;
+  top: 108px; /* header + overall-bar の高さを考慮 */
+  z-index: 35;
+  background: #121826;
+  border-bottom: 1px solid rgba(0,245,255,.18);
+  padding: 6px 0;
+}
+
+header { z-index: 50; }
+.overall-bar-fixed { z-index: 40; }
+.panel > nav.tabs { z-index: 35; }
+
+.name-index{
+  display:grid; grid-template-columns: 1fr 1fr; gap:10px;
+  margin:8px 0 12px; padding:8px;
+  background:rgba(0,245,255,.06);
+  border:1px solid rgba(0,245,255,.18);
+  border-radius:10px;
+}
+@media (max-width:600px){
+  .name-index{grid-template-columns:1fr}
+}
+
+tr.highlight {
+  background: rgba(0, 245, 255, 0.15) !important;
+  transition: background 1.2s ease;
 }
 
 </style>
@@ -861,6 +890,17 @@ function enableEnterTabbing(root){
   // 3～4桁の「スラなし」(927, 0927, 1127, 0105 など)
   const MD_NUM_RE = /^\d{3,4}$/;
 
+  // === 新規追加行へスクロール ===
+function scrollToNewRow(panelId, index) {
+  const selector = `table.name-table[data-panel="${panelId}"] tbody tr:nth-child(${index + 1})`;
+  const row = document.querySelector(selector);
+  if (row) {
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("highlight");
+    setTimeout(() => row.classList.remove("highlight"), 1200);
+  }
+}
+
   // --- Firestore ドキュメント参照ショートカット ---
   window.panelDoc = function(panelId){
     return db.collection('tenants').doc(TENANT_ID)
@@ -877,21 +917,28 @@ function enableEnterTabbing(root){
       return [];
     }
   }
-window.saveNames = function(panelId, arr){
+
+ window.saveNames = function(panelId, arr){
   _showSaving();
   panelDoc(panelId).set({ names: arr }, { merge: true })
     .then(()=>{
       _hideSaving();
+
       // ★ 各タブの氏名インデックス更新
       updateNameIndex(panelId.split('-')[0]);
+
       // ★ 在籍顧問タブは別途グループインデックスも更新
       if(panelId === 'tab4-sub1') updateAdviserIndex();
+
+      // === ★ 新規追加後のスクロール処理 ===
+      const newIndex = arr.length - 1; // 最後に追加された行へ
+      scrollToNewRow(panelId, newIndex);
     })
     .catch(e=>{
       console.error("saveNames error:", e);
       _hideSaving();
     });
-};
+  };
 
   window.readCompleted = async function(panelId){
     try {
@@ -1521,6 +1568,7 @@ async function initForm(form){
 
     form.reset();
     renderTable(panelId);
+    scrollToNewRow(panelId, data.length - 1);
 
     // 氏名入力欄にフォーカス戻す
     if(nameEl) nameEl.focus();
@@ -1838,11 +1886,9 @@ function _hideSaving(){
 // === 各タブの氏名インデックス（足代 / SB）を更新 ===
 async function updateNameIndex(mainId){
   if (mainId === 'tab4') return; // 顧問は別関数
-
   const root = document.querySelector('.name-index[data-main="'+mainId+'"]');
   if(!root) return;
 
-  // sub1=足代 / sub2=SB
   const [dFoot, dSb] = await Promise.all([
     readNames(mainId + '-sub1').then(normalizeData),
     readNames(mainId + '-sub2').then(normalizeData).catch(()=>[])
@@ -1853,16 +1899,55 @@ async function updateNameIndex(mainId){
   const namesSb   = [...new Set(dSb.map(r => (r.name||'').trim()).filter(Boolean))]
                       .sort((a,b)=> a.localeCompare(b, 'ja'));
 
-  const section = (title, arr) => `
+  // ★ panelIdを渡して data-panel を付与する
+  const section = (title, arr, panelId) => `
     <div class="col">
       <h4>${title}</h4>
       <div class="name-list">
-        ${arr.length ? arr.map(n=>`<span class="name-pill" title="${esc(n)}">${esc(n)}</span>`).join('') : '<span class="name-pill" style="opacity:.6">（なし）</span>'}
+        ${arr.length
+          ? arr.map(n=>`<span class="name-pill" data-panel="${panelId}" title="${esc(n)}">${esc(n)}</span>`).join('')
+          : '<span class="name-pill" style="opacity:.6">（なし）</span>'}
       </div>
     </div>
   `;
 
-  root.innerHTML = section('足代', namesFoot) + section('SB', namesSb);
+  root.innerHTML =
+    section('足代', namesFoot, mainId + '-sub1') +
+    section('SB',   namesSb,   mainId + '-sub2');
+
+  // ★ クリックで対応行へジャンプ＆ハイライト
+  root.querySelectorAll('.name-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const panelId = pill.dataset.panel;    // 例: "tab1-sub1"
+      const name = pill.textContent.trim();
+      const table = document.querySelector(`table.name-table[data-panel="${panelId}"]`);
+      if (!table) return;
+
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      const target = rows.find(r => {
+        const cell = r.querySelector('td[data-label="氏名"]');
+        return cell && cell.textContent.trim() === name;
+      });
+
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('highlight');
+        setTimeout(() => target.classList.remove('highlight'), 1200);
+      }
+    });
+  });
+}
+
+
+// === 新規追加行へスクロール ===
+function scrollToNewRow(panelId, index) {
+  const selector = `table.name-table[data-panel="${panelId}"] tbody tr:nth-child(${index + 1})`;
+  const row = document.querySelector(selector);
+  if (row) {
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("highlight");
+    setTimeout(() => row.classList.remove("highlight"), 1200);
+  }
 }
 
 // === 在籍顧問（tab4）のグループ別氏名インデックス ===
