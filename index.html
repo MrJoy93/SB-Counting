@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v3.0</title>
+<title>SB-Counting v3.1</title>
 <style>
 
   html, body {
@@ -918,27 +918,25 @@ function scrollToNewRow(panelId, index) {
     }
   }
 
- window.saveNames = function(panelId, arr){
+window.saveNames = function(panelId, arr){
   _showSaving();
   panelDoc(panelId).set({ names: arr }, { merge: true })
     .then(()=>{
       _hideSaving();
-
-      // ★ 各タブの氏名インデックス更新
       updateNameIndex(panelId.split('-')[0]);
-
-      // ★ 在籍顧問タブは別途グループインデックスも更新
       if(panelId === 'tab4-sub1') updateAdviserIndex();
 
-      // === ★ 新規追加後のスクロール処理 ===
-      const newIndex = arr.length - 1; // 最後に追加された行へ
-      scrollToNewRow(panelId, newIndex);
+      // ★ 在籍顧問以外のみスクロール
+      if (!panelId.startsWith('tab4')) {
+        const newIndex = arr.length - 1;
+        scrollToNewRow(panelId, newIndex);
+      }
     })
     .catch(e=>{
       console.error("saveNames error:", e);
       _hideSaving();
     });
-  };
+};
 
   window.readCompleted = async function(panelId){
     try {
