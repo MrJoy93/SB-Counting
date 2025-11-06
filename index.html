@@ -836,6 +836,7 @@ const TENANT_ID = "prod";
 // 次にフォーカスさせたいセルの予約（renderTable完了後に拾う）
 window.__pendingFocus__ = null; // { panelId, r, k }
 
+
 // Enterで次要素に移動（最後ならsubmit）
 function enableEnterTabbing(root){
   const sel = 'input, select, textarea, button';
@@ -843,43 +844,67 @@ function enableEnterTabbing(root){
     if(e.key !== 'Enter') return;
 
     // === md-input（日付セル）は特殊処理 ===
-if (e.target && e.target.classList.contains('md-input')) {
-  const panelId = e.target.dataset.panel;
+    if (e.target && e.target.classList.contains('md-input')) {
+      const panelId = e.target.dataset.panel;
 
-  // ★ 在籍顧問タブでは Enter 処理をスキップ（通常動作）
-  if (panelId.startsWith('tab4')) return;
+      // ★ 在籍顧問タブでは「次の行の先頭（D1）」へ移動
+      if (panelId.startsWith('tab4')) {
+        e.preventDefault();
+        e.stopPropagation();
 
-  e.preventDefault();
-  e.stopPropagation();
+        const currentInput = e.target;
+        const currentRow = currentInput.closest('tr');
+        if (!currentRow) return;
 
-  const r = Number(e.target.dataset.row);
-  const k = Number(e.target.dataset.di);
+        // DOM順で次の <tr> を取得
+        let nextRow = currentRow.nextElementSibling;
+        // 小計行・グループ行をスキップ
+        while (nextRow && (nextRow.classList.contains('group-row') || nextRow.classList.contains('group-subtotal'))) {
+          nextRow = nextRow.nextElementSibling;
+        }
 
-  const totalSlots = 10;
-  const nextK = (k + 1) % totalSlots;
-  const nextR = (nextK === 0) ? (r + 1) : r;
+        // 次の行の D1（data-di="0"）セルへ
+        if (nextRow) {
+          const nextInput = nextRow.querySelector(
+            `input.md-input[data-panel="${panelId}"][data-di="0"]`
+          );
+          if (nextInput) nextInput.focus();
+        }
+        return;
+      }
 
-  __pendingFocus__ = { panelId, r: nextR, k: nextK };
-  e.target.dispatchEvent(new Event('change', { bubbles: true }));
-  return;
-}
+      // === 通常タブ：同じ行の次→行送り ===
+      e.preventDefault();
+      e.stopPropagation();
+      const r = Number(e.target.dataset.row);
+      const k = Number(e.target.dataset.di);
+      const totalSlots = 10;
+      const nextK = (k + 1) % totalSlots;
+      const nextR = (nextK === 0) ? (r + 1) : r;
+
+      __pendingFocus__ = { panelId, r: nextR, k: nextK };
+      e.target.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
 
     // === textareaは改行を優先 ===
-    if(e.target && e.target.tagName === 'TEXTAREA') return;
+    if (e.target && e.target.tagName === 'TEXTAREA') return;
 
-    // === それ以外の入力要素は単純に次へ ===
+    // === その他の入力要素は次の要素へ ===
     e.preventDefault();
     const focusables = Array.from(root.querySelectorAll(sel))
       .filter(el => !el.disabled && el.type !== 'hidden' && el.offsetParent !== null);
     const i = focusables.indexOf(e.target);
-    if(i > -1 && i < focusables.length - 1){
-      focusables[i+1].focus();
-    }else{
+    if (i > -1 && i < focusables.length - 1) {
+      focusables[i + 1].focus();
+    } else {
       const submit = root.querySelector('button[type="submit"], input[type="submit"]');
-      if(submit) submit.click();
+      if (submit) submit.click();
     }
-  });
-}
+  }); // ← keydown イベントの閉じ
+} // ← 関数の閉じ
+
+
 
 
 (function(){
