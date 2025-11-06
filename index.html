@@ -843,26 +843,26 @@ function enableEnterTabbing(root){
     if(e.key !== 'Enter') return;
 
     // === md-input（日付セル）は特殊処理 ===
-    if (e.target && e.target.classList.contains('md-input')) {
-      e.preventDefault();
-      e.stopPropagation();
+if (e.target && e.target.classList.contains('md-input')) {
+  const panelId = e.target.dataset.panel;
 
-      const panelId = e.target.dataset.panel;
-      const r = Number(e.target.dataset.row);
-      const k = Number(e.target.dataset.di);
+  // ★ 在籍顧問タブでは Enter 処理をスキップ（通常動作）
+  if (panelId.startsWith('tab4')) return;
 
-        // 10スロット固定。次は「同じ行の次→行送り」
-        const totalSlots = 10;
-        const nextK = (k + 1) % totalSlots;
-        const nextR = (nextK === 0) ? (r + 1) : r;
+  e.preventDefault();
+  e.stopPropagation();
 
-       // ★ Enterの意図を最優先：無条件で上書き
-       __pendingFocus__ = { panelId, r: nextR, k: nextK };
+  const r = Number(e.target.dataset.row);
+  const k = Number(e.target.dataset.di);
 
-      // それから change を発火 → 保存・再描画 → renderTable末尾で予約が拾われる
-      e.target.dispatchEvent(new Event('change', { bubbles: true }));
-      return;
-    }
+  const totalSlots = 10;
+  const nextK = (k + 1) % totalSlots;
+  const nextR = (nextK === 0) ? (r + 1) : r;
+
+  __pendingFocus__ = { panelId, r: nextR, k: nextK };
+  e.target.dispatchEvent(new Event('change', { bubbles: true }));
+  return;
+}
 
     // === textareaは改行を優先 ===
     if(e.target && e.target.tagName === 'TEXTAREA') return;
