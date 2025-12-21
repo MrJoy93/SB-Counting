@@ -6,450 +6,600 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v3.3</title>
+<title>SB-Counting v3.4</title>
 <style>
-
-  html, body {
-  background-color: #121826 !important;
-  color: #eaf6ff; /* 既存の文字色と統一 */
-}
+  html, body{
+    background-color:#121826 !important;
+    color:#eaf6ff;
+  }
 
   :root{
-    --brand:#00f5ff; --panel:rgba(30,38,60,.78); --text:#eaf6ff; --muted:#97e4f5;
-    --checked-bg: rgba(0,245,255,.14); --checked-border: rgba(0,245,255,.55);
-  }
-  *{box-sizing:border-box}
-  body{margin:0;background:#121826;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,"M PLUS 2",sans-serif}
-  header{position:sticky;top:0;background:#1a2134;border-bottom:1px solid rgba(0,245,255,.25);padding:10px 16px;z-index:50}
-  header h1{margin:0;font-size:16px}
-  .tabs-bar{display:flex;align-items:center;gap:12px}
-  header .tabs{flex:1}
-  nav.tabs{display:flex;gap:8px;align-items:center;margin-top:8px;overflow-x:auto}
-  .tab-btn{appearance:none;border:1px solid rgba(0,245,255,.35);background:#141a2a;color:#b9e9f5;padding:8px 14px;border-radius:10px;cursor:pointer}
-  .tab-btn[aria-selected="true"]{color:#00f5ff;border-color:#00f5ff}
-  .overall-unpaid{margin-left:auto;font-weight:700;color:#eaf6ff;background:rgba(0,245,255,.16);border:1px solid rgba(0,245,255,.35);padding:6px 10px;border-radius:10px;white-space:nowrap}
-
-  main{max-width:none;margin:16px auto 48px;padding:0 12px}
-  .panel{display:none;background:var(--panel);border:1px solid rgba(0,245,255,.18);border-radius:12px;padding:14px}
-  .panel.active{display:block}
-  .heading{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 0 8px}
-  .main-unpaid{font-weight:700;color:#eaf6ff;background:rgba(0,245,255,.12);border:1px solid rgba(0,245,255,.35);padding:6px 10px;border-radius:10px;white-space:nowrap}
-
-  .name-form{margin:6px 0 10px;padding:10px;border:1px solid rgba(0,245,255,.22);border-radius:10px;background:rgba(16,24,40,.55)}
-  .label{font-size:12px;color:var(--muted);letter-spacing:.12em;display:inline-block;margin-bottom:6px}
-  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .input, input{padding:8px 10px;border-radius:10px;border:1px solid rgba(0,245,255,.35);background:#273a57;color:#eaf6ff}
-  .btn{padding:8px 12px;border-radius:10px;border:1px solid rgba(0,245,255,.35);background:#1c2a4a;color:#eaf6ff;cursor:pointer}
-
-  .table-wrap{width:100%;overflow-x:auto}
-  table{width:100%;border-collapse:separate;border-spacing:0;background:#162038;border-radius:12px;table-layout:fixed;font-size:14px}
-  th,td{white-space:nowrap;border-bottom:1px solid rgba(0,245,255,.25);padding:6px}
-  th{background:#20365a;color:#00f5ff}
-  tr:last-child td{border-bottom:none}
-
-  /* widths */
-  table th:first-child, table td:first-child{width:44px}
-  table th:nth-child(2), table td:nth-child(2){min-width:110px;max-width:160px;overflow:hidden;text-overflow:ellipsis}
-  table th:last-child, table td:last-child{width:96px}
-  .amount-cell,.unpaid-cell,.remain-cell{min-width:100px;text-align:right;font-weight:bold}
-
-  .date-td{transition:background .18s ease, box-shadow .18s ease}
-  .date-td.is-checked{background:var(--checked-bg);box-shadow:inset 0 0 0 1px var(--checked-border)}
-  .date-wrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:2px 0}
-  .day-check{width:18px;height:18px;accent-color:var(--brand)}
-  .md-input{width:72px;text-align:center}
-  .md-input.invalid{border-color:#f43f5e;box-shadow:0 0 8px rgba(244,63,94,.35)}
-
-  .buy-cell{text-align:right}
-  .completed-wrap{margin-top:14px}
-  .completed-wrap h4{margin:8px 0 6px;font-size:14px;color:#9fb9c9}
-
-  /* modal for SB buy editing (tab1-3 only) */
-  .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:1000}
-  .modal.show{display:flex}
-  .modal .backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45)}
-  .modal .dialog{position:relative;background:#0f172a;border:1px solid rgba(0,245,255,.25);border-radius:12px;min-width:320px;max-width:640px;width:90%;padding:14px}
-  .modal h4{margin:0 0 8px;font-size:16px}
-  .buy-list{display:grid;grid-template-columns:1fr 140px;gap:8px;max-height:50vh;overflow:auto;margin:8px 0}
-  .buy-list .name{align-self:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .buy-list input{width:100%}
-  .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-
-  /* Adviser (在籍顧問) のグループ見出し＆小計行 */
-.group-row td{
-  background:#20365a;
-  color:#bfefff;
-  font-weight:700;
-  border-bottom:1px solid rgba(0,245,255,.35);
-}
-.group-subtotal td{
-  background:#1a2b49;
-  color:#eaf6ff;
-  font-weight:700;
-  border-top:1px dashed rgba(0,245,255,.35);
-}
-
-/* 見出し行を左右レイアウトにして、バッジ群を右端へ */
-.heading{
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;        /* 幅が狭い時は折り返し */
-  gap: 8px;               /* 適度な余白 */
-}
-
-/* 最初のバッジで“右側スペース”を埋める＝以降のバッジを右端に寄せる */
-.heading .main-unpaid:first-of-type{
-  margin-left: auto;      /* これでバッジ群が右寄せになる */
-}
-
-/* バッジ同士の間隔（必要なら） */
-.heading .main-unpaid{
-  margin-left: 6px;
-}
-
-/* スマホ等で2段になった時、見出しとバッジの間を少し空ける（任意） */
-@media (max-width: 480px){
-
-}
-
-/* スマホ画面の調整 */
-@media (max-width: 600px) {
-  header h1 { font-size: 14px; }
-  .tab-btn { padding:6px 10px; font-size:12px; }
-  .input, input, .btn { font-size:14px; padding:6px 8px; }
-
-  /* フォーム行は縦積み */
-  .row {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .row .input, .row .btn {
-    width: 100%;
+    --brand:#00f5ff;
+    --panel:rgba(30,38,60,.78);
+    --text:#eaf6ff;
+    --muted:#97e4f5;
+    --checked-bg: rgba(0,245,255,.14);
+    --checked-border: rgba(0,245,255,.55);
   }
 
-  /* テーブルは横スクロールを前提に */
-  table { font-size: 12px; }
-  th, td { padding:4px; }
+  *{ box-sizing:border-box; }
 
-    .heading{
-    row-gap: 6px;
+  body{
+    margin:0;
+    background:#121826;
+    color:var(--text);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"M PLUS 2",sans-serif;
   }
 
-}
-
-nav.tabs {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.modal .dialog {
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-/* 全体合計バーを横並びに */
-.overall-bar {
-  display: flex;
-  flex-wrap: wrap;        /* 横幅が足りない時は折り返し */
-  gap: 8px;               /* バッジ同士の間隔 */
-  margin: 12px 0;         /* 上下の余白は好みに合わせて */
-}
-
-.overall-bar .overall-unpaid {
-  flex: 0 0 auto;         /* 必要分だけ幅を取る */
-}
-
-/* === Mobile Card Layout === */
-@media (max-width: 720px) {
-  /* テーブル→カード化の基本 */
-  .table-wrap { overflow: visible; }
-  table { display:block; border-collapse: initial; border-spacing:0; }
-  thead { display:none; }
-  tbody { display:block; }
-  tbody tr {
-    display:block;
-    background:#162038;
-    border:1px solid rgba(0,245,255,.18);
-    border-radius:12px;
-    margin:12px 0;
-    padding:8px 10px;
-    overflow:hidden;
+  header{
+    position:sticky;
+    top:0;
+    background:#1a2134;
+    border-bottom:1px solid rgba(0,245,255,.25);
+    padding:10px 16px;
+    z-index:50;
   }
-  tbody td {
-    display:grid;
-    grid-template-columns: 8.5em 1fr; /* 左がラベル、右が値 */
+  header h1{ margin:0; font-size:16px; }
+
+  .tabs-bar{ display:flex; align-items:center; gap:12px; }
+  header .tabs{ flex:1; }
+
+  nav.tabs{
+    display:flex;
     gap:8px;
     align-items:center;
-    border:none !important;
-    padding:6px 4px;
-    white-space:normal;
-  }
-  tbody td::before {
-    content: attr(data-label);
-    color: var(--muted);
-    font-size: 12px;
-    letter-spacing: .06em;
+    margin-top:8px;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
   }
 
-  /* 金額系は強調しつつ右寄せ維持 */
-  .amount-cell, .unpaid-cell, .remain-cell { text-align:right; font-weight:700; }
-
-  /* 日付セル（D1〜D10）は詰めて表示 */
-  .date-td .date-wrap { align-items:flex-start; gap:4px; }
-  .day-check { width:20px; height:20px; }
-  .md-input { width:90px; } /* タップしやすく */
-
-  /* ボタンのタップ領域 */
-  .btn { width:100%; min-height:40px; }
-
-  /* 追加フォームは縦積みフル幅 */
-  .row { flex-direction: column; align-items: stretch; }
-  .row .input, .row .btn { width:100%; }
-
-  /* モーダルは高さ優先でスクロール */
-  .modal .dialog { max-height:90vh; overflow:auto; }
-  .buy-list { max-height: 56vh; }
-  
-  /* 在籍顧問のグループ見出し/小計 行もカード風 */
-  tr.group-row td, tr.group-subtotal td {
-    display:block;
-    grid-template-columns: 1fr !important;
-    padding:10px !important;
+  .tab-btn{
+    appearance:none;
+    border:1px solid rgba(0,245,255,.35);
+    background:#141a2a;
+    color:#b9e9f5;
+    padding:8px 14px;
+    border-radius:10px;
+    cursor:pointer;
+    white-space:nowrap;
   }
-}
+  .tab-btn[aria-selected="true"]{ color:#00f5ff; border-color:#00f5ff; }
 
-/* ===== Mobile header layout fix ===== */
-@media (max-width: 720px) {
-  /* ヘッダー全体を折り返し可に */
-  .tabs-bar {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-    flex-wrap: wrap;
+  .overall-unpaid{
+    margin-left:auto;
+    font-weight:700;
+    color:#eaf6ff;
+    background:rgba(0,245,255,.16);
+    border:1px solid rgba(0,245,255,.35);
+    padding:6px 10px;
+    border-radius:10px;
+    white-space:nowrap;
   }
 
-  /* 1行目：タブを横スクロールで全幅に */
-  header .tabs {
-    order: 1;
-    flex: 1 1 100%;
-    max-width: 100%;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding-bottom: 6px; /* スクロールバーの余白 */
+  main{ max-width:none; margin:16px auto 48px; padding:0 12px; }
+
+  .panel{
+    display:none;
+    background:var(--panel);
+    border:1px solid rgba(0,245,255,.18);
+    border-radius:12px;
+    padding:14px;
   }
-  header .tabs .tab-btn {
-    flex: 0 0 auto;      /* 折り返さず流せるように */
-    white-space: nowrap;
+  .panel.active{ display:block; }
+
+  /* 見出し */
+  .heading{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin:0 0 8px;
+    flex-wrap:wrap;
+  }
+  .main-unpaid{
+    font-weight:700;
+    color:#eaf6ff;
+    background:rgba(0,245,255,.12);
+    border:1px solid rgba(0,245,255,.35);
+    padding:6px 10px;
+    border-radius:10px;
+    white-space:nowrap;
+  }
+  /* バッジ群の右寄せ */
+  .heading .main-unpaid:first-of-type{ margin-left:auto; }
+  .heading .main-unpaid{ margin-left:6px; }
+
+  .name-form{
+    margin:6px 0 10px;
+    padding:10px;
+    border:1px solid rgba(0,245,255,.22);
+    border-radius:10px;
+    background:rgba(16,24,40,.55);
   }
 
-  /* 2行目：未払バッジは右寄せで縦に積む */
-  #overall-unpaid,
-  #adviser-unpaid {
-    order: 2;            /* 同じ行に配置できるよう同順位 */
-    margin-left: auto;   /* 右端へ寄せる */
-    display: block;
-    width: max-content;  /* コンテンツ幅に縮める */
-  }
-  #adviser-unpaid {      /* 下の段へ少し間隔 */
-    margin-top: 6px;
+  .label{
+    font-size:12px;
+    color:var(--muted);
+    letter-spacing:.12em;
+    display:inline-block;
+    margin-bottom:6px;
   }
 
-  /* 見切れ対策：ヘッダー内のテキスト微縮小 */
-  header h1 { font-size: 14px; }
-  .tab-btn { padding: 6px 10px; font-size: 12px; }
-}
-
-@media (max-width: 720px) {
-  /* 日付セル内の配置を横並びに */
-  .date-td .date-wrap {
-    flex-direction: row;     /* ← 縦並び→横並び */
-    justify-content: flex-start;
-    align-items: center;
-    gap: 6px;                /* チェックと日付の間隔 */
-    padding: 0;
+  .row{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
   }
 
-  .day-check { width: 18px; height: 18px; }
-  .md-input  { width: 72px; font-size: 12px; padding: 4px 6px; }
-}
-
-@media (max-width: 720px) {
-  /* 操作セルは横並びでボタンだけ見せる */
-  td[data-label="操作"] {
-    display: flex !important;
-    justify-content: flex-end;   /* 右寄せ */
-    align-items: center;
-    gap: 6px;
+  .input, input{
+    padding:8px 10px;
+    border-radius:10px;
+    border:1px solid rgba(0,245,255,.35);
+    background:#273a57;
+    color:#eaf6ff;
   }
-  td[data-label="操作"]::before {
-    content: "";   /* ラベルを消す */
+
+  .btn{
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid rgba(0,245,255,.35);
+    background:#1c2a4a;
+    color:#eaf6ff;
+    cursor:pointer;
+    white-space:nowrap;
   }
-  td[data-label="操作"] .btn {
-    width: auto;   /* 横幅いっぱいじゃなく適度なサイズ */
-    min-height: 32px;
-    padding: 4px 10px;
+
+  /* ===== テーブル（共通） ===== */
+  .table-wrap{
+    width:100%;
+    overflow-x:auto;
+    padding-right:0;
   }
-}
 
-@media (max-width: 720px) {
-  .filter-row { display:block; }
-}
-@media (min-width: 721px) {
-  .filter-row { display:none; } /* PCでは非表示 */
-}
-
-@media (max-width: 480px) {
-  header {
-    justify-content: space-between; /* 横幅に応じて整列 */
+  table{
+    width:100%;
+    border-collapse:separate;
+    border-spacing:0;
+    background:#162038;
+    border-radius:12px;
+    table-layout:fixed;           /* モバイル/デフォは fixed */
+    font-size:14px;
   }
-  .overall-unpaid {
-    flex: 1 1 45%; /* 2列レイアウト */
+
+  th, td{
+    white-space:nowrap;
+    border-bottom:1px solid rgba(0,245,255,.25);
+    padding:6px;
   }
-}
+  th{ background:#20365a; color:#00f5ff; }
+  tr:last-child td{ border-bottom:none; }
 
-@media (max-width: 600px) {
-  .overall-bar {
-    flex-direction: column;  /* 縦並び */
-    align-items: flex-start; /* 左寄せ */
+  .amount-cell,.unpaid-cell,.remain-cell{
+    min-width:100px;
+    text-align:right;
+    font-weight:bold;
   }
-  .overall-bar .overall-unpaid {
-    width: 100%;             /* フル幅 */
+
+  /* 日付セル */
+  .date-td{ transition:background .18s ease, box-shadow .18s ease; }
+  .date-td.is-checked{
+    background:var(--checked-bg);
+    box-shadow:inset 0 0 0 1px var(--checked-border);
   }
-}
-
-/* === 全体合計バー === */
-/* PC：横並びで右寄せ */
-.overall-bar {
-  display: flex;
-  justify-content: flex-end;   /* ← 右寄せ */
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
-}
-/* overallバー内では、グローバルの margin-left:auto を無効化 */
-.overall-bar .overall-unpaid {
-  margin-left: 0;              /* ← これが効かないと右に寄らない */
-  flex: 0 0 auto;
-}
-
-/* スマホ：同じサイズの枠で揃える（2列グリッド） */
-@media (max-width: 600px) {
-  .overall-bar {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));  /* 2列で均等幅 */
-    gap: 8px;
-    justify-content: initial;
+  .date-wrap{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+    padding:2px 0;
   }
-  .overall-bar .overall-unpaid {
-    width: 100%;               /* カード幅を揃える */
-    text-align: center;        /* 文言は中央 */
+  .day-check{ width:18px; height:18px; accent-color:var(--brand); }
+  .md-input{ width:72px; text-align:center; }
+  .md-input.invalid{ border-color:#f43f5e; box-shadow:0 0 8px rgba(244,63,94,.35); }
+
+  .buy-cell{ text-align:right; }
+
+  .completed-wrap{ margin-top:14px; }
+  .completed-wrap h4{ margin:8px 0 6px; font-size:14px; color:#9fb9c9; }
+
+  /* modal */
+  .modal{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
   }
-}
-/* さらに狭い端末は1列に */
-@media (max-width: 360px) {
-  .overall-bar { grid-template-columns: 1fr; }
-}
-
-/* === overallバー（スマホ時）を同サイズに揃える強制上書き === */
-@media (max-width: 600px) {
-  .overall-bar {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2列均等 */
-    gap: 8px;
+  .modal.show{ display:flex; }
+  .modal .backdrop{ position:absolute; inset:0; background:rgba(0,0,0,.45); }
+  .modal .dialog{
+    position:relative;
+    background:#0f172a;
+    border:1px solid rgba(0,245,255,.25);
+    border-radius:12px;
+    min-width:320px;
+    max-width:640px;
+    width:90%;
+    padding:14px;
+    max-height:90vh;
+    overflow:auto;
   }
-  .overall-bar .overall-unpaid {
-    width: 100% !important;     /* ← max-content を打ち消す */
-    min-height: 40px;           /* 高さも揃えたい場合 */
-    display: flex;
-    align-items: center;
-    justify-content: center;    /* 文字を中央に */
-    white-space: nowrap;
+  .modal h4{ margin:0 0 8px; font-size:16px; }
+  .buy-list{
+    display:grid;
+    grid-template-columns:1fr 140px;
+    gap:8px;
+    max-height:56vh;
+    overflow:auto;
+    margin:8px 0;
   }
-}
-/* さらに狭い端末は1列 */
-@media (max-width: 360px) {
-  .overall-bar { grid-template-columns: 1fr; }
-}
-
-/* === ヘッダー用のID指定はヘッダー内だけに限定（衝突回避） === */
-@media (max-width: 720px) {
-  header #overall-unpaid,
-  header #adviser-unpaid {
-    width: max-content;   /* ← ヘッダー内だけで有効にする */
-    margin-left: auto;
+  .buy-list .name{
+    align-self:center;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
   }
-}
+  .buy-list input{ width:100%; }
+  .modal .actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:12px; }
 
-/* 在籍顧問リセットボタン（右下固定） */
-#adviser-clear-dates {
-  display: none;              /* デフォルト非表示 */
-  margin: 16px auto 0;        /* 下に余白をつけて中央寄せ */
-  background: #d32f2f;
-  color: #fff;
-  border: none;
-  padding: 12px 20px;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-}
-#adviser-clear-dates.show {
-  display: block;             /* JSで末尾に来たら表示 */
-}
+  /* Adviser group row */
+  .group-row td{
+    background:#20365a;
+    color:#bfefff;
+    font-weight:700;
+    border-bottom:1px solid rgba(0,245,255,.35);
+  }
+  .group-subtotal td{
+    background:#1a2b49;
+    color:#eaf6ff;
+    font-weight:700;
+    border-top:1px dashed rgba(0,245,255,.35);
+  }
 
-/* === Name Index (氏名インデックス) === */
-.name-index{
-  display:grid; grid-template-columns: 1fr 1fr; gap:10px;
-  margin:8px 0 12px; padding:8px;
-  background:rgba(0,245,255,.06);
-  border:1px solid rgba(0,245,255,.18);
-  border-radius:10px;
-}
-.name-index .col{background:#0f172a;border:1px solid rgba(0,245,255,.18);border-radius:10px;padding:8px}
-.name-index .col h4{margin:0 0 6px;font-size:13px;color:#9fdaf0;letter-spacing:.06em}
-.name-list{
-  display:flex; flex-wrap:wrap; gap:6px; align-items:flex-start;
-  max-height:120px; overflow:auto;
-}
-.name-pill{
-  padding:4px 8px; border:1px solid rgba(0,245,255,.35);
-  border-radius:999px; background:#1c2a4a; color:#eaf6ff; font-size:12px;
-  max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-}
-@media (max-width:600px){
-  .name-index{grid-template-columns:1fr}
-}
+  /* ヘッダー内の小調整 */
+  header{ z-index:50; }
+  .overall-bar-fixed{ z-index:40; }
 
-.panel > nav.tabs {
-  position: sticky;
-  top: 108px; /* header + overall-bar の高さを考慮 */
-  z-index: 35;
-  background: #121826;
-  border-bottom: 1px solid rgba(0,245,255,.18);
-  padding: 6px 0;
-}
+  /* overallバー */
+  .overall-bar{
+    display:flex;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+    gap:8px;
+    margin:12px 0;
+  }
+  .overall-bar .overall-unpaid{
+    margin-left:0;
+    flex:0 0 auto;
+  }
 
-header { z-index: 50; }
-.overall-bar-fixed { z-index: 40; }
-.panel > nav.tabs { z-index: 35; }
+  /* Name Index */
+  .name-index{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    margin:8px 0 12px;
+    padding:8px;
+    background:rgba(0,245,255,.06);
+    border:1px solid rgba(0,245,255,.18);
+    border-radius:10px;
+  }
+  .name-index .col{
+    background:#0f172a;
+    border:1px solid rgba(0,245,255,.18);
+    border-radius:10px;
+    padding:8px;
+  }
+  .name-index .col h4{
+    margin:0 0 6px;
+    font-size:13px;
+    color:#9fdaf0;
+    letter-spacing:.06em;
+  }
+  .name-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    align-items:flex-start;
+    max-height:120px;
+    overflow:auto;
+  }
+  .name-pill{
+    padding:4px 8px;
+    border:1px solid rgba(0,245,255,.35);
+    border-radius:999px;
+    background:#1c2a4a;
+    color:#eaf6ff;
+    font-size:12px;
+    max-width:160px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
 
-.name-index{
-  display:grid; grid-template-columns: 1fr 1fr; gap:10px;
-  margin:8px 0 12px; padding:8px;
-  background:rgba(0,245,255,.06);
-  border:1px solid rgba(0,245,255,.18);
-  border-radius:10px;
-}
-@media (max-width:600px){
-  .name-index{grid-template-columns:1fr}
-}
+  /* panel tabs sticky */
+  .panel > nav.tabs{
+    position:sticky;
+    top:108px; /* header + overall-bar */
+    z-index:35;
+    background:#121826;
+    border-bottom:1px solid rgba(0,245,255,.18);
+    padding:6px 0;
+  }
 
-tr.highlight {
-  background: rgba(0, 245, 255, 0.15) !important;
-  transition: background 1.2s ease;
-}
+  /* highlight */
+  tr.highlight{
+    background: rgba(0, 245, 255, 0.15) !important;
+    transition: background 1.2s ease;
+  }
 
+  /* 在籍顧問リセットボタン */
+  #adviser-clear-dates{
+    display:none;
+    margin:16px auto 0;
+    background:#d32f2f;
+    color:#fff;
+    border:none;
+    padding:12px 20px;
+    border-radius:6px;
+    font-size:14px;
+    font-weight:bold;
+    cursor:pointer;
+  }
+  #adviser-clear-dates.show{ display:block; }
+
+  /* ===== スマホ（既存のカード化など） ===== */
+  @media (max-width: 720px){
+    /* テーブル→カード化 */
+    .table-wrap{ overflow:visible; }
+    table{ display:block; border-collapse:initial; border-spacing:0; }
+    thead{ display:none; }
+    tbody{ display:block; }
+    tbody tr{
+      display:block;
+      background:#162038;
+      border:1px solid rgba(0,245,255,.18);
+      border-radius:12px;
+      margin:12px 0;
+      padding:8px 10px;
+      overflow:hidden;
+    }
+    tbody td{
+      display:grid;
+      grid-template-columns:8.5em 1fr;
+      gap:8px;
+      align-items:center;
+      border:none !important;
+      padding:6px 4px;
+      white-space:normal;
+    }
+    tbody td::before{
+      content: attr(data-label);
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .06em;
+    }
+    .amount-cell, .unpaid-cell, .remain-cell{ text-align:right; font-weight:700; }
+
+    .date-td .date-wrap{
+      flex-direction: row;
+      justify-content: flex-start;
+      align-items: center;
+      gap: 6px;
+      padding: 0;
+    }
+    .day-check{ width:18px; height:18px; }
+    .md-input{ width:72px; font-size:12px; padding:4px 6px; }
+
+    .btn{ width:100%; min-height:40px; }
+
+    tr.group-row td, tr.group-subtotal td{
+      display:block;
+      grid-template-columns:1fr !important;
+      padding:10px !important;
+    }
+
+    /* 操作セル：横並び（ラベル消す） */
+    td[data-label="操作"]{
+      display:flex !important;
+      justify-content:flex-end;
+      align-items:center;
+      gap:6px;
+    }
+    td[data-label="操作"]::before{ content:""; }
+    td[data-label="操作"] .btn{
+      width:auto;
+      min-height:32px;
+      padding:4px 10px;
+    }
+  }
+
+  /* ヘッダーのモバイル整列 */
+  @media (max-width: 720px){
+    .tabs-bar{
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    header .tabs{
+      order:1;
+      flex:1 1 100%;
+      max-width:100%;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      padding-bottom:6px;
+    }
+    #overall-unpaid, #adviser-unpaid{
+      order:2;
+      margin-left:auto;
+      display:block;
+      width:max-content;
+    }
+    #adviser-unpaid{ margin-top:6px; }
+
+    header h1{ font-size:14px; }
+    .tab-btn{ padding:6px 10px; font-size:12px; }
+  }
+
+  /* overall-bar：スマホは2列グリッド */
+  @media (max-width: 600px){
+    .overall-bar{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0,1fr));
+      gap:8px;
+      justify-content:initial;
+    }
+    .overall-bar .overall-unpaid{
+      width:100% !important;
+      min-height:40px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+      white-space:nowrap;
+    }
+  }
+  @media (max-width: 360px){
+    .overall-bar{ grid-template-columns:1fr; }
+  }
+
+  @media (max-width: 600px){
+    header h1{ font-size:14px; }
+    .tab-btn{ padding:6px 10px; font-size:12px; }
+    .input, input, .btn{ font-size:14px; padding:6px 8px; }
+    .row{ flex-direction:column; align-items:stretch; }
+    .row .input, .row .btn{ width:100%; }
+    table{ font-size:12px; }
+    th, td{ padding:4px; }
+  }
+
+  @media (max-width: 720px){
+    .filter-row{ display:block; }
+  }
+  @media (min-width: 721px){
+    .filter-row{ display:none; }
+  }
+
+  @media (max-width: 480px){
+    header{ justify-content:space-between; }
+    .overall-unpaid{ flex:1 1 45%; }
+  }
+
+  @media (max-width: 600px){
+    .name-index{ grid-template-columns:1fr; }
+  }
+
+  /* =========================================================
+     PC列幅 + 右端（金額/操作）干渉対策（最終版）
+     ========================================================= */
+  @media (min-width: 721px){
+    /* PCは自然に幅が伸びてOK（横スクロールに逃がす） */
+    .table-wrap table{
+      table-layout:auto !important;
+      width:max-content !important;
+      min-width:100% !important;
+    }
+
+    /* # */
+    table th:nth-child(1),
+    table td:nth-child(1){
+      width:36px; min-width:36px; text-align:center;
+    }
+
+    /* 氏名 */
+    table th:nth-child(2),
+    table td:nth-child(2){
+      width:90px; min-width:84px; max-width:96px;
+      overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    }
+
+    /* 担当 */
+    table th:nth-child(3),
+    table td:nth-child(3){
+      width:44px; min-width:44px; text-align:center;
+    }
+
+    /* D1〜D10 */
+    table th:nth-child(n+4):nth-child(-n+13),
+    table td:nth-child(n+4):nth-child(-n+13){
+      width:56px; min-width:56px; text-align:center;
+    }
+
+    /* D10と合計金額の隙間を詰める */
+    table th:nth-child(13),
+    table td:nth-child(13){ padding-right:2px; }
+    table th:nth-child(14),
+    table td:nth-child(14){ padding-left:2px; }
+
+    /* 合計金額 */
+    table th:nth-child(14),
+    table td:nth-child(14){
+      width:92px; min-width:92px; text-align:right;
+    }
+
+    /* 未払金額（干渉しやすいので広め） */
+    table th:nth-child(15),
+    table td:nth-child(15){
+      width:110px; min-width:110px; text-align:right; padding-right:8px;
+    }
+
+    /* 操作（2ボタン前提） */
+    table th:nth-child(16),
+    table td:nth-child(16){
+      width:140px; min-width:140px; text-align:center;
+      padding-left:8px; padding-right:6px;
+    }
+
+    td[data-label="操作"]{
+      display:flex;
+      justify-content:flex-end;
+      align-items:center;
+      gap:6px;
+      overflow:hidden; /* 被り根絶 */
+      box-sizing:border-box;
+    }
+    td[data-label="操作"] .btn{
+      width:auto;
+      padding:4px 8px;
+      font-size:12px;
+      white-space:nowrap;
+      flex:0 0 auto;
+    }
+  }
+
+  /* =========================================================
+     削除ボタン（赤）
+     HTML: <button class="btn btn-delete">削除</button>
+     ========================================================= */
+  .btn-delete{
+    background: linear-gradient(180deg, #c62828, #8e1e1e);
+    border-color: rgba(255,107,107,.95);
+    color:#fff;
+    font-weight:700;
+  }
+  .btn-delete:hover{
+    background: linear-gradient(180deg, #e53935, #b71c1c);
+    border-color: rgba(255,154,154,.95);
+  }
+  .btn-delete:active{
+    background:#7f1515;
+    transform: translateY(1px);
+  }
+  .btn-delete:focus-visible{
+    outline:2px solid rgba(255,80,80,.9);
+    outline-offset:2px;
+  }
 </style>
+
+
+
+
+
+
+
 </head>
 <body>
 <header>
