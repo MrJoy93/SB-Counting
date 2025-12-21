@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v3.4</title>
+<title>SB-Counting v4.0</title>
 <style>
   html, body{
     background-color:#121826 !important;
@@ -592,6 +592,61 @@
     outline:2px solid rgba(255,80,80,.9);
     outline-offset:2px;
   }
+
+  .btn-group{
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;        /* 狭い時は折り返し */
+}
+
+.btn.btn-sub{
+  background:#1c2a4a;
+  border-color: rgba(0,245,255,.35);
+}
+
+/* 赤（完全削除） */
+.btn.btn-danger{
+  background: rgba(220, 38, 38, .22);
+  border-color: rgba(220, 38, 38, .65);
+  color:#fff;
+}
+.btn.btn-danger:hover{
+  background: rgba(220, 38, 38, .34);
+}
+
+/* ===== 在籍顧問：削除履歴の操作ボタン配置 ===== */
+.deleted-wrap td[data-label="操作"]{
+  display:flex !important;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  flex-wrap:nowrap;          /* 基本は折り返さない */
+}
+
+.deleted-wrap td[data-label="操作"] .btn{
+  width:auto !important;
+  padding:4px 10px !important;
+  font-size:12px !important;
+  white-space:nowrap;
+}
+
+/* 操作列が詰まる場合は、列幅を確保 */
+.deleted-wrap table th:last-child,
+.deleted-wrap table td:last-child{
+  min-width: 160px;
+}
+
+/* 画面が狭い時だけ折り返し許可（見切れ防止） */
+@media (max-width: 720px){
+  .deleted-wrap td[data-label="操作"]{
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+}
+
+
 </style>
 
 
@@ -932,10 +987,25 @@
           </thead><tbody></tbody>
         </table>
       </div>
+      
       <div id="adv-bottom-sentinel" aria-hidden="true"></div>
       <button id="adviser-clear-dates" type="button" class="btn" style="display:none">
        在籍顧問：日付を全クリア
       </button>
+
+      <div class="deleted-wrap" data-panel="tab4-sub1">
+  <h4>削除履歴</h4>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>削除日</th><th>グループ</th><th>担当</th><th>氏名</th><th>操作</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
 
     </section>
   </section>
@@ -1017,6 +1087,29 @@ window.scrollToNewRow = function(panelId, index) {
              .collection('panels').doc(panelId);
   }
 
+  // --- Firestore版 read/save（買取終了=completed） ---
+window.readCompleted = async function(panelId){
+  try {
+    const snap = await panelDoc(panelId).get();
+    return snap.exists ? (snap.data().completed || []) : [];
+  } catch(e){
+    console.error("readCompleted error:", e);
+    return [];
+  }
+};
+
+window.saveCompleted = function(panelId, arr){
+  _showSaving();
+  return panelDoc(panelId).set({ completed: arr }, { merge: true })
+    .then(()=>{ _hideSaving(); })
+    .catch(e=>{
+      console.error("saveCompleted error:", e);
+      _hideSaving();
+      throw e;
+    });
+};
+
+
   // --- Firestore版 read/save ---
   window.readNames = async function(panelId){
     try {
@@ -1028,44 +1121,77 @@ window.scrollToNewRow = function(panelId, index) {
     }
   }
 
-window.saveNames = function(panelId, arr){
-  _showSaving();
-  return panelDoc(panelId).set({ names: arr }, { merge: true })  // ← return を付ける
-    .then(()=>{
-      _hideSaving();
-      updateNameIndex(panelId.split('-')[0]);
-      if(panelId === 'tab4-sub1') updateAdviserIndex();
+  window.saveNames = function(panelId, arr){
+    _showSaving();
+    return panelDoc(panelId).set({ names: arr }, { merge: true })
+      .then(()=>{
+        _hideSaving();
+        updateNameIndex(panelId.split('-')[0]);
+        if(panelId === 'tab4-sub1') updateAdviserIndex();
+      })
+      .catch(e=>{
+        console.error("saveNames error:", e);
+        _hideSaving();
+        throw e;
+      });
+  };
 
-      // ★ ここは削除済み/削除推奨（保存でスクロールしない）
-      // if (!panelId.startsWith('tab4')) { ... }
-    })
-    .catch(e=>{
-      console.error("saveNames error:", e);
-      _hideSaving();
-      throw e; // ← 呼び出し側で必要なら拾える
-    });
-};
-
-  window.readCompleted = async function(panelId){
+    // ================================
+  // 在籍顧問：削除履歴 read / save
+  // ================================
+  window.readAdviserDeleted = async function(panelId){
     try {
       const snap = await panelDoc(panelId).get();
-      return snap.exists ? (snap.data().completed || []) : [];
+      return snap.exists ? (snap.data().adviser_deleted || []) : [];
     } catch(e){
-      console.error("readCompleted error:", e);
+      console.error("readAdviserDeleted error:", e);
       return [];
     }
-  }
-window.saveCompleted = function(panelId, arr){
-  _showSaving(); // ← 保存開始時に表示
-  panelDoc(panelId).set({ completed: arr }, { merge: true })
-    .then(()=>{
-      _hideSaving(); // ← 正常終了したら非表示
-    })
-    .catch(e=>{
-      console.error("saveCompleted error:", e);
-      _hideSaving(); // ← エラーでも必ず非表示
-    });
-};
+  };
+
+  window.saveAdviserDeleted = function(panelId, arr){
+    _showSaving();
+    return panelDoc(panelId).set({ adviser_deleted: arr }, { merge: true })
+      .then(()=>{ _hideSaving(); })
+      .catch(e=>{
+        console.error("saveAdviserDeleted error:", e);
+        _hideSaving();
+        throw e;
+      });
+  };
+
+  // ================================
+  // 在籍顧問：削除 → 履歴へ移動
+  //   rowIndex: 表示上の行index（0-based）
+  // ================================
+  window.moveAdviserRowToDeleted = async function(panelId, rowIndex){
+    if(!panelId || !String(panelId).startsWith("tab4")) return;
+
+    const data = normalizeData(await readNames(panelId));
+    if(!data[rowIndex]) return;
+
+    const removed = data[rowIndex];
+    const deletedItem = {
+      ...removed,
+      deletedAt: new Date().toISOString()
+    };
+
+    // names から削除して保存
+    data.splice(rowIndex, 1);
+    await saveNames(panelId, data);
+
+    // 履歴へ追加（新しいものを上へ）
+    const hist = await readAdviserDeleted(panelId);
+    hist.unshift(deletedItem);
+    await saveAdviserDeleted(panelId, hist);
+
+    // UI更新（renderAdviserDeleted は別途追加）
+    renderTable(panelId);
+    if (typeof window.renderAdviserDeleted === "function") {
+  window.renderAdviserDeleted(panelId);
+}
+  };
+
 
   // --- 既存の補助関数たちはそのまま ---
   window.esc = function(s){ return String(s).replace(/[&<>"']/g,
@@ -1636,59 +1762,68 @@ async function initForm(form){
     if (groupEl) {
       const lastGroup = localStorage.getItem("lastAdvGroup");
       if (lastGroup) groupEl.value = lastGroup;
-      // 選択変更ごとに保存
       groupEl.addEventListener("change", () => {
         localStorage.setItem("lastAdvGroup", groupEl.value);
       });
     }
   }
 
-  renderTable(panelId);
+  // ★ 初期描画は await（順序保証）
+  await renderTable(panelId);
 
-form.addEventListener('submit', async (e)=>{
-  e.preventDefault();
-
-  const nameEl  = form.querySelector('input[name="name"]');
-  const buyEl   = form.querySelector('input[name="buy"]');
-  const groupEl = form.querySelector('select[name="group"]');
-  const staffEl = form.querySelector('input[name="staff"]');
-
-  const name = (nameEl && nameEl.value || "").trim();
-  if(!name) return;
-
-  const buy  = Math.max(0, Number(buyEl && buyEl.value || 0));
-  const data = normalizeData(await readNames(panelId));
-
-  const row = {
-    name,
-    dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
-  };
-  if(panelId.endsWith('sub2') && !isAdviser(panelId)) row.buy = buy;
-  if(isAdviser(panelId) && groupEl) {
-    row.group = String(groupEl.value || "");
-    localStorage.setItem("lastAdvGroup", row.group);
+  // ★ 在籍顧問の削除履歴も初期表示で必ず更新
+  if (panelId === "tab4-sub1" && typeof window.renderAdviserDeleted === "function") {
+    await window.renderAdviserDeleted(panelId);
   }
-  if(staffEl) row.staff = String(staffEl.value || "");
 
-  data.push(row);
+  form.addEventListener('submit', async (e)=>{
+    e.preventDefault();
 
-  // ★ ここが重要：保存→描画→スクロールの順序を保証
-  await saveNames(panelId, data);     // ← saveNamesをPromiseで返すようにする（下を参照）
-  await renderTable(panelId);         // ← renderTableがasyncなのでawait可能
-  scrollToNewRow(panelId, data.length - 1);
+    const nameEl  = form.querySelector('input[name="name"]');
+    const buyEl   = form.querySelector('input[name="buy"]');
+    const groupEl = form.querySelector('select[name="group"]');
+    const staffEl = form.querySelector('input[name="staff"]');
 
-  form.reset();
+    const name = (nameEl && nameEl.value || "").trim();
+    if(!name) return;
 
-  // 氏名入力欄にフォーカス戻す
-  if(nameEl) nameEl.focus();
+    const buy  = Math.max(0, Number(buyEl && buyEl.value || 0));
+    const data = normalizeData(await readNames(panelId));
 
-  // === form.reset()で<select>も初期化されるので復元 ===
-  if (isAdviser(panelId) && groupEl) {
-    const lastGroup = localStorage.getItem("lastAdvGroup");
-    if (lastGroup) groupEl.value = lastGroup;
-  }
-});
+    const row = {
+      name,
+      dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
+    };
+    if(panelId.endsWith('sub2') && !isAdviser(panelId)) row.buy = buy;
+    if(isAdviser(panelId) && groupEl) {
+      row.group = String(groupEl.value || "");
+      localStorage.setItem("lastAdvGroup", row.group);
+    }
+    if(staffEl) row.staff = String(staffEl.value || "");
+
+    data.push(row);
+
+    await saveNames(panelId, data);
+    await renderTable(panelId);
+
+    // ★ 追加後も在籍顧問なら履歴の枠がDOM上でズレないように再描画（任意だが安全）
+    if (panelId === "tab4-sub1" && typeof window.renderAdviserDeleted === "function") {
+      await window.renderAdviserDeleted(panelId);
+    }
+
+    scrollToNewRow(panelId, data.length - 1);
+
+    form.reset();
+
+    if(nameEl) nameEl.focus();
+
+    if (isAdviser(panelId) && groupEl) {
+      const lastGroup = localStorage.getItem("lastAdvGroup");
+      if (lastGroup) groupEl.value = lastGroup;
+    }
+  });
 }
+
 
 // 「買取終了」→ アクティブへ戻す
 document.addEventListener('click', async (e)=>{
@@ -1717,23 +1852,25 @@ document.addEventListener('click', async (e)=>{
 
 document.querySelectorAll('form.name-form').forEach(initForm);
 
-
-
   // 削除（アクティブ）※確認ダイアログ付き
-  document.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-action="del"]');
-    if(!btn) return;
-    const panelId = btn.dataset.panel; 
-    const idx = Number(btn.dataset.index);
-    const data = normalizeData(await readNames(panelId));
-    const row = data[idx];
-    const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
-    if(!window.confirm(`${name} を削除します。よろしいですか？`)) return;
-    data.splice(idx,1); 
-    saveNames(panelId, data);
-    renderTable(panelId); 
-    if(!isAdviser(panelId)) renderCompletedTable(panelId);
-  });
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="del"]');
+  if(!btn) return;
+
+  const panelId = btn.dataset.panel;
+  const idx = Number(btn.dataset.index);
+
+  // ★ 在籍顧問(tab4)だけは「履歴へ移動」
+  if (panelId && panelId.startsWith("tab4")) {
+    await moveAdviserRowToDeleted(panelId, idx);
+    return;
+  }
+
+  // ★それ以外は従来削除
+  data.splice(idx, 1);
+  await saveNames(panelId, data);
+  renderTable(panelId);
+});
 
   // 削除（完了テーブル）※確認ダイアログ付き
 document.addEventListener('click', async (e)=>{   // ★ async を追加
@@ -2074,6 +2211,163 @@ async function updateAdviserIndex(){
   }
   root.innerHTML = html;
 }
+
+window.renderAdviserDeleted = async function(panelId){
+  
+  if(!isAdviser(panelId)) return;
+
+  const wrap = document.querySelector(`.deleted-wrap[data-panel="${panelId}"]`);
+  if(!wrap) return;
+
+  const tbody = wrap.querySelector('tbody');
+  if(!tbody) return;
+
+  const hist = await readAdviserDeleted(panelId);
+  const data = normalizeData(hist);
+
+  // ★ 追加：group の表示名マップ
+  const GROUP_LABEL = { tab1:"タチバナ", tab2:"ＯＺ", tab3:"その他" };
+  const toGroupLabel = (v)=> GROUP_LABEL[v] ?? (v || "");
+
+  tbody.innerHTML = data.map((row, i)=>{
+    const del = row.deletedAt ? new Date(row.deletedAt) : null;
+    const delText = del
+      ? `${del.getFullYear()}/${String(del.getMonth()+1).padStart(2,'0')}/${String(del.getDate()).padStart(2,'0')} ${String(del.getHours()).padStart(2,'0')}:${String(del.getMinutes()).padStart(2,'0')}`
+      : '';
+
+    const groupLabel = toGroupLabel(row.group);
+
+    return `
+      <tr>
+        <td data-label="削除日">${esc(delText)}</td>
+        <td data-label="グループ">${esc(groupLabel)}</td>
+        <td data-label="担当">${esc(row.staff || '')}</td>
+        <td data-label="氏名">${esc(row.name || '')}</td>
+        <td data-label="操作" class="adel-actions">
+          <button class="btn" data-action="adel-restore" data-index="${i}" data-panel="${panelId}">戻す</button>
+          <button class="btn btn-danger" data-action="adel-del" data-index="${i}" data-panel="${panelId}">完全削除</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+
+// 履歴→アクティブへ戻す
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="adel-restore"]');
+  if(!btn) return;
+
+  const panelId = btn.dataset.panel;
+  const idx = Number(btn.dataset.index);
+
+  const hist = normalizeData(await readAdviserDeleted(panelId));
+  const row = hist[idx];
+  if(!row) return;
+
+  // deletedAt は消す（任意）
+  delete row.deletedAt;
+
+  const active = normalizeData(await readNames(panelId));
+  active.push(row);
+  hist.splice(idx, 1);
+
+  await saveNames(panelId, active);
+  await saveAdviserDeleted(panelId, hist);
+
+  renderTable(panelId);
+  renderAdviserDeleted(panelId);
+});
+
+// 履歴の完全削除
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="adel-del"]');
+  if(!btn) return;
+
+  const panelId = btn.dataset.panel;
+  const idx = Number(btn.dataset.index);
+
+  const hist = normalizeData(await readAdviserDeleted(panelId));
+  const row = hist[idx];
+  const name = row?.name ? `「${row.name}」` : `No.${idx+1}`;
+  if(!window.confirm(`${name} を履歴から完全削除します。よろしいですか？`)) return;
+
+  hist.splice(idx, 1);
+  await saveAdviserDeleted(panelId, hist);
+  renderAdviserDeleted(panelId);
+});
+
+function ensureAdviserDeletedContainer(panelId){
+  const table = document.querySelector(`table.name-table[data-panel="${panelId}"]`);
+  if(!table) return null;
+
+  let wrap = document.querySelector(`.adviser-deleted-wrap[data-panel="${panelId}"]`);
+  if(wrap) return wrap;
+
+  wrap = document.createElement('div');
+  wrap.className = 'adviser-deleted-wrap';
+  wrap.dataset.panel = panelId;
+  wrap.innerHTML = `
+    <h3 class="section-title">削除履歴</h3>
+    <div class="hint">※「削除」した項目がここに残ります</div>
+    <table class="name-table adviser-deleted-table">
+      <thead>
+        <tr>
+          <th>氏名</th><th>担当</th><th>グループ</th><th>削除日時</th>
+        </tr>
+      </thead>
+      <tbody class="adviser-deleted-body"></tbody>
+    </table>
+  `;
+
+  table.insertAdjacentElement('afterend', wrap);
+  return wrap;
+}
+
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-action="adel-restore"], button[data-action="adel-del"]');
+  if(!btn) return;
+
+  const panelId = btn.dataset.panel;
+  const idx = Number(btn.dataset.index);
+  if(!isAdviser(panelId)) return;
+
+  const hist = await readAdviserDeleted(panelId);
+  if(!hist || !hist[idx]) return;
+
+  if(btn.dataset.action === "adel-restore"){
+    // 履歴から取り出して names へ戻す
+    const item = hist[idx];
+
+    const names = normalizeData(await readNames(panelId));
+    names.push({
+      name: item.name || "",
+      staff: item.staff || "",
+      group: item.group || "",
+      dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
+    });
+
+    // 履歴から削除
+    hist.splice(idx, 1);
+
+    await saveNames(panelId, names);
+    await saveAdviserDeleted(panelId, hist);
+
+    renderTable(panelId);
+    renderAdviserDeleted(panelId);
+    return;
+  }
+
+  if(btn.dataset.action === "adel-del"){
+    const name = hist[idx]?.name ? `「${hist[idx].name}」` : `No.${idx+1}`;
+    if(!confirm(`${name} を履歴から完全削除します。よろしいですか？`)) return;
+
+    hist.splice(idx, 1);
+    await saveAdviserDeleted(panelId, hist);
+    renderAdviserDeleted(panelId);
+    return;
+  }
+});
 
 
 </script>
