@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v3.2</title>
+<title>SB-Counting v3.3</title>
 <style>
 
   html, body {
@@ -851,7 +851,7 @@ window.__pendingFocus__ = null; // { panelId, r, k }
   const MD_NUM_RE = /^\d{3,4}$/;
 
   // === 新規追加行へスクロール ===
-function scrollToNewRow(panelId, index) {
+window.scrollToNewRow = function(panelId, index) {
   const selector = `table.name-table[data-panel="${panelId}"] tbody tr:nth-child(${index + 1})`;
   const row = document.querySelector(selector);
   if (row) {
@@ -859,7 +859,7 @@ function scrollToNewRow(panelId, index) {
     row.classList.add("highlight");
     setTimeout(() => row.classList.remove("highlight"), 1200);
   }
-}
+};
 
   // --- Firestore ドキュメント参照ショートカット ---
   window.panelDoc = function(panelId){
@@ -880,21 +880,19 @@ function scrollToNewRow(panelId, index) {
 
 window.saveNames = function(panelId, arr){
   _showSaving();
-  panelDoc(panelId).set({ names: arr }, { merge: true })
+  return panelDoc(panelId).set({ names: arr }, { merge: true })  // ← return を付ける
     .then(()=>{
       _hideSaving();
       updateNameIndex(panelId.split('-')[0]);
       if(panelId === 'tab4-sub1') updateAdviserIndex();
 
-      // ★ 在籍顧問以外のみスクロール
-      if (!panelId.startsWith('tab4')) {
-        const newIndex = arr.length - 1;
-        scrollToNewRow(panelId, newIndex);
-      }
+      // ★ ここは削除済み/削除推奨（保存でスクロールしない）
+      // if (!panelId.startsWith('tab4')) { ... }
     })
     .catch(e=>{
       console.error("saveNames error:", e);
       _hideSaving();
+      throw e; // ← 呼び出し側で必要なら拾える
     });
 };
 
@@ -1497,46 +1495,49 @@ async function initForm(form){
 
   renderTable(panelId);
 
-  form.addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const nameEl  = form.querySelector('input[name="name"]');
-    const buyEl   = form.querySelector('input[name="buy"]');
-    const groupEl = form.querySelector('select[name="group"]');
-    const staffEl = form.querySelector('input[name="staff"]');
+form.addEventListener('submit', async (e)=>{
+  e.preventDefault();
 
-    const name = (nameEl && nameEl.value || "").trim();
-    if(!name) return;
+  const nameEl  = form.querySelector('input[name="name"]');
+  const buyEl   = form.querySelector('input[name="buy"]');
+  const groupEl = form.querySelector('select[name="group"]');
+  const staffEl = form.querySelector('input[name="staff"]');
 
-    const buy  = Math.max(0, Number(buyEl && buyEl.value || 0));
-    const data = normalizeData(await readNames(panelId));
+  const name = (nameEl && nameEl.value || "").trim();
+  if(!name) return;
 
-    const row = {
-      name,
-      dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
-    };
-    if(panelId.endsWith('sub2') && !isAdviser(panelId)) row.buy = buy;
-    if(isAdviser(panelId) && groupEl) {
-      row.group = String(groupEl.value || "");
-      localStorage.setItem("lastAdvGroup", row.group); // ← 追加：submit時にも保存
-    }
-    if(staffEl) row.staff = String(staffEl.value || "");
+  const buy  = Math.max(0, Number(buyEl && buyEl.value || 0));
+  const data = normalizeData(await readNames(panelId));
 
-    data.push(row);
-    saveNames(panelId, data);
+  const row = {
+    name,
+    dates: Array(10).fill(0).map(()=>({md:"",ymd:"",checked:false}))
+  };
+  if(panelId.endsWith('sub2') && !isAdviser(panelId)) row.buy = buy;
+  if(isAdviser(panelId) && groupEl) {
+    row.group = String(groupEl.value || "");
+    localStorage.setItem("lastAdvGroup", row.group);
+  }
+  if(staffEl) row.staff = String(staffEl.value || "");
 
-    form.reset();
-    renderTable(panelId);
-    scrollToNewRow(panelId, data.length - 1);
+  data.push(row);
 
-    // 氏名入力欄にフォーカス戻す
-    if(nameEl) nameEl.focus();
+  // ★ ここが重要：保存→描画→スクロールの順序を保証
+  await saveNames(panelId, data);     // ← saveNamesをPromiseで返すようにする（下を参照）
+  await renderTable(panelId);         // ← renderTableがasyncなのでawait可能
+  scrollToNewRow(panelId, data.length - 1);
 
-    // === form.reset()で<select>も初期化されるので復元 ===
-    if (isAdviser(panelId) && groupEl) {
-      const lastGroup = localStorage.getItem("lastAdvGroup");
-      if (lastGroup) groupEl.value = lastGroup;
-    }
-  });
+  form.reset();
+
+  // 氏名入力欄にフォーカス戻す
+  if(nameEl) nameEl.focus();
+
+  // === form.reset()で<select>も初期化されるので復元 ===
+  if (isAdviser(panelId) && groupEl) {
+    const lastGroup = localStorage.getItem("lastAdvGroup");
+    if (lastGroup) groupEl.value = lastGroup;
+  }
+});
 }
 
 // 「買取終了」→ アクティブへ戻す
@@ -1896,18 +1897,6 @@ async function updateNameIndex(mainId){
   });
 }
 
-
-// === 新規追加行へスクロール ===
-function scrollToNewRow(panelId, index) {
-  const selector = `table.name-table[data-panel="${panelId}"] tbody tr:nth-child(${index + 1})`;
-  const row = document.querySelector(selector);
-  if (row) {
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
-    row.classList.add("highlight");
-    setTimeout(() => row.classList.remove("highlight"), 1200);
-  }
-}
-
 // === 在籍顧問（tab4）のグループ別氏名インデックス ===
 async function updateAdviserIndex(){
   const root = document.querySelector('.name-index[data-main="tab4"]');
@@ -1940,4 +1929,3 @@ async function updateAdviserIndex(){
 </script>
 </body>
 </html>
-
