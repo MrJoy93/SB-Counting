@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v4.0</title>
+<title>SB-Counting v4.1</title>
 <style>
   html, body{
     background-color:#121826 !important;
@@ -1275,6 +1275,99 @@ function parseMD(txt){
       return { name, staff, buy, group, dates };
     });
   }
+  
+  // === 在籍顧問(tab4-sub1)だけ：Enterで確定→次セルへ ===
+
+  // === 在籍顧問(tab4-sub1)だけ：クリックしたセルにフォーカスを維持する予約 ===
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('input.md-input');
+  if (!el) return;
+
+  const panelId = el.dataset.panel;
+  if (panelId !== 'tab4-sub1') return; // ★在籍顧問だけ
+
+  const r = Number(el.dataset.row);
+  const k = Number(el.dataset.di);
+
+  // クリックで選んだセルを「再描画後の復帰先」として予約する
+  // （change→renderTableでDOMが差し替わっても、render後にここへ戻す）
+  window.__pendingFocus__ = { panelId, r, k, src: 'click' };
+}, true);
+
+
+document.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+
+  const el = e.target.closest('input.md-input');
+  if (!el) return;
+
+  const panelId = el.dataset.panel;
+  if (panelId !== 'tab4-sub1') return;   // ★在籍顧問だけ
+
+  e.preventDefault();
+  e.stopPropagation();
+
+  const r = Number(el.dataset.row);
+  const k = Number(el.dataset.di);
+
+  const data = normalizeData(await readNames(panelId));
+  if (!data[r]) return;
+
+  const raw = (el.value || "").trim();
+
+  // 次セル（同じ行の次→行送り）
+  const totalSlots = (data[r].dates && data[r].dates.length) ? data[r].dates.length : 10;
+  const nextK = (k + 1 < totalSlots) ? (k + 1) : 0;
+  const nextR = (k + 1 < totalSlots) ? r : (r + 1);
+
+  // 空入力＝削除（チェック状態は維持）
+  if (raw === "") {
+    el.classList.remove('invalid');
+    const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+    data[r].dates[k] = { md: "", ymd: "", checked: wasChecked };
+
+    saveNames(panelId, data);
+
+    // ★再描画後に次セルへ
+    window.__pendingFocus__ = { panelId, r: nextR, k: nextK };
+    renderTable(panelId);
+    return;
+  }
+
+  // 在籍顧問はDDのみ（既存ロジック踏襲）
+  if (!DD_RE.test(raw)) {
+    el.classList.add('invalid');
+    return;
+  }
+
+  el.classList.remove('invalid');
+  const wasChecked = !!(data[r].dates[k] && data[r].dates[k].checked);
+  const day = String(Number(raw)).padStart(2, '0');
+  data[r].dates[k] = { md: day, ymd: "", checked: wasChecked };
+
+  saveNames(panelId, data);
+
+  // ★再描画後に次セルへ
+  window.__pendingFocus__ = { panelId, r: nextR, k: nextK };
+  renderTable(panelId);
+}, true);
+
+// ===== 在籍顧問(tab4-sub1)だけ：クリックしたセルを再描画後に復帰させる =====
+document.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('input.md-input');
+  if (!el) return;
+
+  const panelId = el.dataset.panel || '';
+  if (panelId !== 'tab4-sub1') return; // ★在籍顧問だけ（必要なら tab4 全体にしたければ isAdviser(panelId) に）
+
+  const r = Number(el.dataset.row);
+  const k = Number(el.dataset.di);
+
+  // クリック先を最優先で復帰させる（DOM差し替えでフォーカスが消えるのを防ぐ）
+  window.__pendingFocus__ = { panelId, r, k, src: 'click' };
+}, true);
+
+
 
   // 値確定：在籍顧問はDDのみ保存（ymdは空）、その他はMM/DD→YYYY-MM-DDへ
 document.addEventListener('change', async (e)=>{
@@ -1297,8 +1390,8 @@ document.addEventListener('change', async (e)=>{
     saveNames(panelId, data);
     renderTable(panelId);
     // ★ 再描画後に次セルへ
-if (!window.__pendingFocus__) {
-  __pendingFocus__ = { panelId, r: nextR, k: nextK }; // ← 予約が無いときだけ補完
+if (!isAdviser(panelId) && !window.__pendingFocus__) {
+  __pendingFocus__ = { panelId, r: nextR, k: nextK };
 }
     return;
   }
@@ -1311,9 +1404,11 @@ if(isAdv){
   data[r].dates[k] = { md: day, ymd: "", checked: wasChecked };
   saveNames(panelId, data);
   renderTable(panelId);
-  if (!window.__pendingFocus__) {
-    __pendingFocus__ = { panelId, r: nextR, k: nextK };
-  }
+
+  if (!isAdviser(panelId) && !window.__pendingFocus__) {
+  __pendingFocus__ = { panelId, r: nextR, k: nextK };
+}
+
   }else{
     // 通常：MM/DD → YYYY-MM-DD
     const md = parseMD(raw);
@@ -1324,8 +1419,8 @@ if(isAdv){
     data[r].dates[k] = { md:(md.mm+"/"+md.dd), ymd: mdToISO(md, yyyy), checked: wasChecked };
     saveNames(panelId, data);
     renderTable(panelId);
-if (!window.__pendingFocus__) {
-  __pendingFocus__ = { panelId, r: nextR, k: nextK }; // ← 予約が無いときだけ補完
+if (!isAdviser(panelId) && !window.__pendingFocus__) {
+  __pendingFocus__ = { panelId, r: nextR, k: nextK };
 }
   }
 });
@@ -1625,22 +1720,34 @@ async function renderTable(panelId){
     tbody.innerHTML = htmlParts.join('');
     updateMainUnpaid(panelId.split('-')[0]);
 
-    // ★ 追加：在籍顧問タブでも、再描画後に予約フォーカスを反映（i と r,k の両対応）
-    if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
-      const pf = __pendingFocus__;
-      requestAnimationFrame(() => {
-        if (typeof pf.i === 'number') {
-          const list = document.querySelectorAll('input.md-input[data-panel="'+panelId+'"]');
-          const el = list[pf.i];
-          if (el) { el.focus(); if(el.select) el.select(); }
-        } else if (pf.r != null && pf.k != null) {
-          const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+pf.r+'"][data-di="'+pf.k+'"]';
-          const el  = document.querySelector(sel);
-          if (el) { el.focus(); if(el.select) el.select(); }
-        }
-        __pendingFocus__ = null;
-      });
+    // ★ 在籍顧問タブでも、再描画後に予約フォーカスを反映（クリック時はselectしない）
+if (window.__pendingFocus__ && __pendingFocus__.panelId === panelId) {
+  const pf = __pendingFocus__;
+  requestAnimationFrame(() => {
+    let el = null;
+
+    if (typeof pf.i === 'number') {
+      const list = document.querySelectorAll('input.md-input[data-panel="'+panelId+'"]');
+      el = list[pf.i] || null;
+    } else if (pf.r != null && pf.k != null) {
+      const sel = 'input.md-input[data-panel="'+panelId+'"][data-row="'+pf.r+'"][data-di="'+pf.k+'"]';
+      el = document.querySelector(sel);
     }
+
+    if (el) {
+      el.focus();
+
+      // click由来は「クリック位置にキャレットが置かれる」感覚を優先して select しない
+      // Enter由来（src未指定 or src==='enter' 等）は従来通り select
+      if (pf.src !== 'click' && typeof el.select === 'function') {
+        el.select();
+      }
+    }
+
+    window.__pendingFocus__ = null;
+  });
+}
+
 
     // 最後にボタン制御
     toggleAdviserClearButton(panelId);
