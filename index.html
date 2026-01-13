@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v4.1</title>
+<title>SB-Counting v4.2</title>
 <style>
   html, body{
     background-color:#121826 !important;
@@ -2291,12 +2291,15 @@ async function updateNameIndex(mainId){
   });
 }
 
+
 // === 在籍顧問（tab4）のグループ別氏名インデックス ===
 async function updateAdviserIndex(){
   const root = document.querySelector('.name-index[data-main="tab4"]');
   if(!root) return;
 
-  const dAdv = normalizeData(await readNames('tab4-sub1'));
+  const panelId = 'tab4-sub1'; // 在籍顧問はここ固定
+  const dAdv = normalizeData(await readNames(panelId));
+
   const buckets = { tab1: [], tab2: [], tab3: [], _other: [] };
   dAdv.forEach(r=>{
     const g = (r.group==='tab1'||r.group==='tab2'||r.group==='tab3') ? r.group : '_other';
@@ -2304,6 +2307,7 @@ async function updateAdviserIndex(){
   });
 
   const labelMap = { tab1:'タチバナ', tab2:'ＯＺ', tab3:'その他', _other:'未設定' };
+
   let html = '';
   for(const key of ['tab1','tab2','tab3','_other']){
     const arr = [...new Set(buckets[key])].sort((a,b)=>a.localeCompare(b,'ja'));
@@ -2311,13 +2315,42 @@ async function updateAdviserIndex(){
       <div class="col">
         <h4>${labelMap[key]}</h4>
         <div class="name-list">
-          ${arr.length ? arr.map(n=>`<span class="name-pill" title="${esc(n)}">${esc(n)}</span>`).join('') : '<span class="name-pill" style="opacity:.6">（なし）</span>'}
+          ${
+            arr.length
+              ? arr.map(n=>`<span class="name-pill" data-panel="${panelId}" title="${esc(n)}">${esc(n)}</span>`).join('')
+              : '<span class="name-pill" style="opacity:.6">（なし）</span>'
+          }
         </div>
       </div>
     `;
   }
+
   root.innerHTML = html;
+
+  // ★ クリックで対応行へジャンプ＆ハイライト（tab4-sub1）
+  root.querySelectorAll('.name-pill[data-panel]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const panelId = pill.dataset.panel;   // "tab4-sub1"
+      const name = pill.textContent.trim();
+
+      const table = document.querySelector(`table.name-table[data-panel="${panelId}"]`);
+      if (!table) return;
+
+      const rows = Array.from(table.querySelectorAll('tbody tr'));
+      const target = rows.find(r => {
+        const cell = r.querySelector('td[data-label="氏名"]');
+        return cell && cell.textContent.trim() === name;
+      });
+
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        target.classList.add('highlight');
+        setTimeout(() => target.classList.remove('highlight'), 1200);
+      }
+    });
+  });
 }
+
 
 window.renderAdviserDeleted = async function(panelId){
   
