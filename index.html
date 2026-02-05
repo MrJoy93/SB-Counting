@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light">
 <meta name="theme-color" content="#121826" media="(prefers-color-scheme: dark)">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>SB-Counting v4.2</title>
+<title>SB-Counting v4.1</title>
 <style>
   html, body{
     background-color:#121826 !important;
@@ -1960,20 +1960,28 @@ document.addEventListener('click', async (e)=>{
 document.querySelectorAll('form.name-form').forEach(initForm);
 
   // 削除（アクティブ）※確認ダイアログ付き
-document.addEventListener('click', async (e)=>{
+document.addEventListener('click', async (e) => {
   const btn = e.target.closest('button[data-action="del"]');
-  if(!btn) return;
+  if (!btn) return;
 
   const panelId = btn.dataset.panel;
   const idx = Number(btn.dataset.index);
 
+  if (!panelId || Number.isNaN(idx)) return;
+
   // ★ 在籍顧問(tab4)だけは「履歴へ移動」
-  if (panelId && panelId.startsWith("tab4")) {
+  if (panelId.startsWith("tab4")) {
     await moveAdviserRowToDeleted(panelId, idx);
     return;
   }
 
-  // ★それ以外は従来削除
+  // ★ それ以外は通常削除
+  const data = normalizeData(await readNames(panelId));
+  const row = data[idx];
+  const name = row?.name ? `「${row.name}」` : `No.${idx + 1}`;
+
+  if (!window.confirm(`${name} を削除します。よろしいですか？`)) return;
+
   data.splice(idx, 1);
   await saveNames(panelId, data);
   renderTable(panelId);
